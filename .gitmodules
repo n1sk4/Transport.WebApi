@@ -1,0 +1,3 @@
+[submodule "Vendor/transit"]
+	path = Vendor/transit
+	url = https://github.com/google/transit
