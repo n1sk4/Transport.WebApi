@@ -29,9 +29,7 @@ jobs:
           version: '25.3'
 
       - name: Generate GtfsRealtime.cs
-        run: |
-          mkdir -p Generated
-          protoc --csharp_out=Services/Generated /Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto
+        run: protoc --csharp_out=Services/Generated /Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto
         shell: bash
 
       - name: Restore dependencies
