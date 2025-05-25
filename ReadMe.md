@@ -1,3 +1,5 @@
+[![Release build](https://github.com/n1sk4/Transport.WebApi/actions/workflows/release_build.yml/badge.svg)](https://github.com/n1sk4/Transport.WebApi/actions/workflows/release_build.yml)
+
 # Transport.WebApi
 
 ## Description
