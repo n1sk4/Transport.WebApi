@@ -1,4 +1,5 @@
 using Serilog;
+using Transport.WebApi.Options;
 
 internal class Program
 {
@@ -14,11 +15,10 @@ internal class Program
         .CreateLogger();
     builder.Host.UseSerilog();
 
-    builder.Services.AddHttpClient<Transport.WebApi.Services.GtfsDataService>(client =>
-    {
-      client.BaseAddress = new Uri("https://www.zet.hr/");
-      client.Timeout = TimeSpan.FromSeconds(30);
-    });
+    builder.Services.Configure<GtfsOptions>(builder.Configuration.GetSection("Gtfs"));
+
+    builder.Services.AddHttpClient<Transport.WebApi.Services.GtfsDataService>();
+
     builder.Services.AddScoped<Transport.WebApi.Services.GtfsService>();
 
     builder.Services.AddControllers();
@@ -27,7 +27,6 @@ internal class Program
 
     var app = builder.Build();
 
-    // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
       app.UseSwagger();

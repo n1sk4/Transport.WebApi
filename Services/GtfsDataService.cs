@@ -1,7 +1,9 @@
 using CsvHelper;
 using CsvHelper.Configuration;
+using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.IO.Compression;
+using Transport.WebApi.Options;
 
 namespace Transport.WebApi.Services;
 
@@ -9,10 +11,13 @@ public class GtfsDataService
 {
   private readonly HttpClient _httpClient;
   private readonly ILogger<GtfsDataService> _logger;
+  private readonly GtfsOptions _gtfsOptions;
 
-  public GtfsDataService(HttpClient httpClient, ILogger<GtfsDataService> logger)
+  public GtfsDataService(HttpClient httpClient, ILogger<GtfsDataService> logger, IOptions<GtfsOptions> gtfsOptions)
   {
+    _gtfsOptions = gtfsOptions.Value;
     _httpClient = httpClient;
+    _httpClient.BaseAddress = new Uri(gtfsOptions.Value.BaseUrl);
     _logger = logger;
   }
 
@@ -20,7 +25,7 @@ public class GtfsDataService
   {
     try
     {
-      var zipData = await _httpClient.GetByteArrayAsync("gtfs-scheduled/latest");
+      var zipData = await _httpClient.GetByteArrayAsync(_gtfsOptions.StaticDataEndpoint);
 
       using var zipStream = new MemoryStream(zipData);
       using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
@@ -61,11 +66,11 @@ public class GtfsDataService
   {
     try
     {
-      _logger.LogInformation("Fetching realtime GTFS data.");
-      var response = await _httpClient.GetAsync("gtfs-rt-protobuf");
+      _logger.LogDebug("Fetching realtime GTFS data.");
+      var response = await _httpClient.GetAsync(_gtfsOptions.RealtimeDataEndpoint);
       response.EnsureSuccessStatusCode();
       var content = await response.Content.ReadAsByteArrayAsync();
-      _logger.LogInformation("Successfully fetched realtime GTFS data.");
+      _logger.LogDebug("Successfully fetched realtime GTFS data.");
       return content;
     }
     catch (Exception ex)
