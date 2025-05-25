@@ -38,13 +38,13 @@ public class GtfsService
     }
   }
 
-  public async Task<FeedEntity[]> GetCurrentVehiclePositions()
+  public async Task<FeedEntity[]> GetAllVehicles()
   {
     FeedMessage feedMessage = await GetAllRealtimeData();
     return feedMessage.Entity.Where(entity => entity.Vehicle != null).ToArray();
   }
 
-  public async Task<FeedEntity?> GetCurrentVehiclePosition(string vehicleId)
+  public async Task<FeedEntity?> GetAVehicleById(string vehicleId)
   {
     FeedMessage feedMessage = await GetAllRealtimeData();
     foreach (var entity in feedMessage.Entity)
@@ -57,7 +57,7 @@ public class GtfsService
     return null;
   }
 
-  public async Task<FeedEntity[]> GetCurrentVehiclePositionsByRoute(string routeId)
+  public async Task<FeedEntity[]> GetAllVehiclesByRoute(string routeId)
   {
     FeedMessage feedMessage = await GetAllRealtimeData();
     return feedMessage.Entity

@@ -8,6 +8,19 @@ internal class Program
   {
     var builder = WebApplication.CreateBuilder(args);
 
+    ConfigureLogging(builder);
+    ConfigureServices(builder);
+    ConfigureSwagger(builder);
+
+    var app = builder.Build();
+
+    ConfigureMiddleware(app);
+
+    app.Run();
+  }
+
+  private static void ConfigureLogging(WebApplicationBuilder builder)
+  {
     Log.Logger = new LoggerConfiguration()
         .ReadFrom.Configuration(builder.Configuration)
         .Enrich.FromLogContext()
@@ -15,27 +28,32 @@ internal class Program
         .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
         .CreateLogger();
     builder.Host.UseSerilog();
+  }
 
+  private static void ConfigureServices(WebApplicationBuilder builder)
+  {
     builder.Services.Configure<GtfsOptions>(builder.Configuration.GetSection("Gtfs"));
-
     builder.Services.AddHttpClient<Transport.WebApi.Services.GtfsDataService>();
-
     builder.Services.AddScoped<Transport.WebApi.Services.GtfsService>();
-
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
       options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
     builder.Services.AddEndpointsApiExplorer();
+  }
+
+  private static void ConfigureSwagger(WebApplicationBuilder builder)
+  {
     builder.Services.AddSwaggerGen(c =>
     {
       c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "Transport API", Version = "v1" });
       c.CustomSchemaIds(type => type.FullName);
       c.UseInlineDefinitionsForEnums();
     });
+  }
 
-    var app = builder.Build();
-
+  private static void ConfigureMiddleware(WebApplication app)
+  {
     if (app.Environment.IsDevelopment())
     {
       app.UseSwagger();
@@ -43,11 +61,7 @@ internal class Program
     }
 
     app.UseHttpsRedirection();
-
     app.UseAuthorization();
-
     app.MapControllers();
-
-    app.Run();
   }
 }

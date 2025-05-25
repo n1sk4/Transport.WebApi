@@ -19,35 +19,27 @@ public class GtfsDataController : ControllerBase
   }
 
   #region Realtime Data Retrieval
-  [HttpGet("GetAllRealtimeData")]
-  public async Task<IActionResult> GetAllRealtimeData()
-  {
-    _logger.LogDebug("GetAllRealtimeData called");
-    var realtimeData = await _gtfsService.GetAllRealtimeData();
-    return realtimeData != null ? Ok(realtimeData) : NotFound("No realtime data.");
-  }
-
-  [HttpGet("GetAllCurrentVehiclePositions")]
-  public async Task<IActionResult> GetAllCurrentVehiclePositions()
+  [HttpGet("GetAllVehicles")]
+  public async Task<IActionResult> GetAllVehicles()
   {
     _logger.LogDebug("GetCurrentVehiclePositions called");
-    var feedEntities = await _gtfsService.GetCurrentVehiclePositions();
+    var feedEntities = await _gtfsService.GetAllVehicles();
     return feedEntities.Length > 0 ? Ok(feedEntities) : NotFound("No current vehicle positions found.");
   }
 
-  [HttpGet("GetCurrentVehiclePosition")]
-  public async Task<IActionResult> GetCurrentVehiclePosition([Required]string vehicleId)
+  [HttpGet("GetAVehicleById")]
+  public async Task<IActionResult> GetAVehicleById([Required]string vehicleId)
   {
     _logger.LogDebug("GetCurrentVehiclePosition called for vehicleId: {VehicleId}", vehicleId);
-    var feedEntity = await _gtfsService.GetCurrentVehiclePosition(vehicleId);
+    var feedEntity = await _gtfsService.GetAVehicleById(vehicleId);
     return feedEntity != null ? Ok(feedEntity) : NotFound($"Vehicle with ID {vehicleId} not found.");
   }
 
-  [HttpGet("GetCurrentVehiclePositionsByRoute")]
+  [HttpGet("GetAllVehiclesByRoute")]
   public async Task<IActionResult> GetCurrentVehiclePositionsByRoute([Required] string routeId)
   {
     _logger.LogDebug("GetCurrentVehiclePositionsByRoute called for routeId: {RouteId}", routeId);
-    var feedEntities = await _gtfsService.GetCurrentVehiclePositionsByRoute(routeId);
+    var feedEntities = await _gtfsService.GetAllVehiclesByRoute(routeId);
     return feedEntities.Length > 0 ? Ok(feedEntities) : NotFound($"No current vehicle positions found for route ID {routeId}.");
   }
   #endregion
