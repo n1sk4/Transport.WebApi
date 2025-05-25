@@ -22,10 +22,13 @@ public class GtfsService
   {
     byte[] data = await _gtfsDataService.GetRealtimeDataAsync();
     FeedMessage feedMessage = FeedMessage.Parser.ParseFrom(data);
+    var formatter = new Google.Protobuf.JsonFormatter(new Google.Protobuf.JsonFormatter.Settings(true));
+    var json = formatter.Format(feedMessage);
+
     return feedMessage;
   }
 
-  public async Task<FeedEntity> GetAllData()
+  public async Task<FeedEntity> GetAllDataRealtime()
   {
     FeedMessage feedMessage = await GetAllRealtimeData();
     if (feedMessage.Entity.Count > 0)
@@ -56,20 +59,29 @@ public class GtfsService
     }
     return null;
   }
+
+  public async Task<FeedEntity[]> GetCurrentVehiclePositionsByRoute(string routeId)
+  {
+    FeedMessage feedMessage = await GetAllRealtimeData();
+    return feedMessage.Entity
+      .Where(entity => entity.Vehicle != null && entity.Vehicle.Trip != null && entity.Vehicle.Trip.RouteId == routeId)
+      .ToArray();
+  }
+
   #endregion
 
   #region Static Data Retrieval
 
-  public string GetStaticData()
+  public async Task<List<string>> GetAllFileDataStatic(string fileName)
   {
-    string staticDataPath = "gtfs-static-data.json";
-    if (File.Exists(staticDataPath))
+    var fileData = await _gtfsDataService.GetStaticFileDataAsync(fileName);
+    if(fileData.Count > 0)
     {
-      return File.ReadAllText(staticDataPath);
+      return fileData;
     }
     else
     {
-      throw new FileNotFoundException("Static data file not found.", staticDataPath);
+      throw new InvalidDataException($"No data available in the file {fileName}.");
     }
   }
 

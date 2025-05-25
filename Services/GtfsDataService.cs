@@ -1,3 +1,8 @@
+using CsvHelper;
+using CsvHelper.Configuration;
+using System.Globalization;
+using System.IO.Compression;
+
 namespace Transport.WebApi.Services;
 
 public class GtfsDataService
@@ -11,23 +16,46 @@ public class GtfsDataService
     _logger = logger;
   }
 
-  public async Task<byte[]> GetStaticDataAsync()
+  public async Task<List<string>> GetStaticFileDataAsync(string fileName)
   {
     try
     {
-      _logger.LogInformation("Fetching static GTFS data.");
-      var response = await _httpClient.GetAsync("gtfs-scheduled/latest");
-      response.EnsureSuccessStatusCode();
-      var content = await response.Content.ReadAsByteArrayAsync();
-      _logger.LogInformation("Successfully fetched static GTFS data.");
-      return content;
+      var zipData = await _httpClient.GetByteArrayAsync("gtfs-scheduled/latest");
+
+      using var zipStream = new MemoryStream(zipData);
+      using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+      var entry = archive.GetEntry(fileName);
+      if (entry == null)
+      {
+        _logger.LogError($"File {fileName} not found in GTFS static data.");
+        return new List<string>();
+      }
+
+      using var stream = entry.Open();
+      using var reader = new StreamReader(stream);
+
+      var lines = new List<string>();
+      string? line;
+      bool isFirst = true;
+      while ((line = await reader.ReadLineAsync()) != null)
+      {
+        if (isFirst)
+        {
+          isFirst = false; // skip header
+          continue;
+        }
+        lines.Add(line);
+      }
+
+      return lines;
     }
     catch (Exception ex)
     {
-      _logger.LogError(ex, "Error fetching static GTFS data.");
-      throw;
+      _logger.LogError(ex, $"Error fetching data from GTFS static data: {ex.Message}");
+      return new List<string>();
     }
   }
+
 
   public async Task<byte[]> GetRealtimeDataAsync()
   {
