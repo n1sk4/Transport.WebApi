@@ -1,8 +1,5 @@
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-using Google.Protobuf;
 using TransitRealtime;
+using Transport.WebApi.Options;
 
 namespace Transport.WebApi.Services;
 
@@ -72,7 +69,7 @@ public class GtfsService
 
   #region Static Data Retrieval
 
-  public async Task<List<string>> GetAllFileDataStatic(string fileName)
+  public async Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName)
   {
     var fileData = await _gtfsDataService.GetStaticFileDataAsync(fileName);
     if(fileData.Count > 0)
@@ -82,6 +79,21 @@ public class GtfsService
     else
     {
       throw new InvalidDataException($"No data available in the file {fileName}.");
+    }
+  }
+
+  public async Task GetRouteShape(string routeId)
+  {
+    var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.RoutesFile);
+    if (fileData.Count > 0)
+    {
+      // Process the shapes data for the specified routeId
+      // This is a placeholder for actual shape processing logic
+      _logger.LogInformation($"Processing shape data for route {routeId}");
+    }
+    else
+    {
+      throw new InvalidDataException($"No shape data available for route {routeId}.");
     }
   }
 

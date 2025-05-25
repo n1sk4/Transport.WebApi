@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using Transport.WebApi.Options;
 using Transport.WebApi.Services;
 
 namespace Transport.WebApi.Controllers;
@@ -54,10 +55,10 @@ public class GtfsDataController : ControllerBase
   #region Static Data Retrieval
   
   [HttpGet("GetAllStaticFileData")]
-  public async Task<IActionResult> GetAllStaticFileData([Required] string fileName)
+  public async Task<IActionResult> GetAllStaticFileData([Required] GtfsStaticDataFile fileName)
   {
     _logger.LogDebug("GetAllStaticData called");
-    var staticData = await _gtfsService.GetAllFileDataStatic(fileName);
+    var staticData = await _gtfsService.GetAllStaticFileData(fileName);
     return staticData != null ? Ok(staticData) : NotFound("No static data");
   }
 

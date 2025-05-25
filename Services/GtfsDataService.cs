@@ -21,7 +21,7 @@ public class GtfsDataService
     _logger = logger;
   }
 
-  public async Task<List<string>> GetStaticFileDataAsync(string fileName)
+  public async Task<List<string>> GetStaticFileDataAsync(GtfsStaticDataFile fileName)
   {
     try
     {
@@ -29,7 +29,7 @@ public class GtfsDataService
 
       using var zipStream = new MemoryStream(zipData);
       using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
-      var entry = archive.GetEntry(fileName);
+      var entry = archive.GetEntry(fileName.GetFileName());
       if (entry == null)
       {
         _logger.LogError($"File {fileName} not found in GTFS static data.");
