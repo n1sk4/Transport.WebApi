@@ -14,6 +14,13 @@ internal class Program
         .CreateLogger();
     builder.Host.UseSerilog();
 
+    builder.Services.AddHttpClient<Transport.WebApi.Services.GtfsDataService>(client =>
+    {
+      client.BaseAddress = new Uri("https://www.zet.hr/");
+      client.Timeout = TimeSpan.FromSeconds(30);
+    });
+    builder.Services.AddScoped<Transport.WebApi.Services.GtfsService>();
+
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
