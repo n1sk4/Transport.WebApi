@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Configurations>Debug;Release;ReleaseWProtoGen;DebugWProtoGen</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,13 +19,12 @@
     <Folder Include="Services\Generated\" />
   </ItemGroup>
 
-  <Target Name="GenerateProtobuf"
-        BeforeTargets="BeforeBuild"
-        Inputs="Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto"
-        Outputs="Services/Generated/GtfsRealtime.cs">
-    <Exec
-      Command="protoc --csharp_out=Services/Generated Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto"
-      WorkingDirectory="$(ProjectDir)" />
+  <Target Name="GenerateProtobuf" BeforeTargets="BeforeBuild"
+          Inputs="Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto"
+          Outputs="Services/Generated/GtfsRealtime.cs"
+          Condition="'$(Configuration)' == 'DebugWProtoGen' Or '$(Configuration)' == 'ReleaseWProtoGen'">
+    <Exec Command="protoc --csharp_out=Services/Generated Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto"
+          WorkingDirectory="$(ProjectDir)" />
   </Target>
 
 </Project>
