@@ -82,14 +82,20 @@ public class GtfsService
     }
   }
 
-  public async Task GetRouteShape(string routeId)
+  public async Task<List<string>> GetRouteShape(string routeId)
   {
-    var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.RoutesFile);
+    var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.ShapesFile);
     if (fileData.Count > 0)
     {
-      // Process the shapes data for the specified routeId
-      // This is a placeholder for actual shape processing logic
-      _logger.LogInformation($"Processing shape data for route {routeId}");
+      var routeShape = fileData
+          .Where(line => line.Contains(routeId))
+          .Select(line =>
+          {
+            var parts = line.Split(',');
+            return parts.Length > 1 ? string.Join(",", parts.Skip(1)) : string.Empty;
+          })
+          .ToList();
+      return routeShape;
     }
     else
     {

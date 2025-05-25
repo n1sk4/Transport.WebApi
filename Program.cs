@@ -1,4 +1,5 @@
 using Serilog;
+using System.Text.Json.Serialization;
 using Transport.WebApi.Options;
 
 internal class Program
@@ -21,9 +22,17 @@ internal class Program
 
     builder.Services.AddScoped<Transport.WebApi.Services.GtfsService>();
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers().AddJsonOptions(options =>
+    {
+      options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(c =>
+    {
+      c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "Transport API", Version = "v1" });
+      c.CustomSchemaIds(type => type.FullName);
+      c.UseInlineDefinitionsForEnums();
+    });
 
     var app = builder.Build();
 

@@ -62,5 +62,13 @@ public class GtfsDataController : ControllerBase
     return staticData != null ? Ok(staticData) : NotFound("No static data");
   }
 
+  [HttpGet("GetRouteShapeData")]
+  public async Task<IActionResult> GetRouteShapeData([Required] string routeId)
+  {
+    _logger.LogDebug("GetRouteShapeData called for routeId: {RouteId}", routeId);
+    var shapeData = await _gtfsService.GetRouteShape(routeId);
+    return shapeData != null ? Ok(shapeData) : NotFound($"No shape data found for route ID {routeId}.");
+  }
+
   #endregion
 }
