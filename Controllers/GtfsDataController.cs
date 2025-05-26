@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using System.ComponentModel.DataAnnotations;
 using Transport.WebApi.Options;
 using Transport.WebApi.Services;
@@ -14,11 +15,11 @@ public class GtfsDataController : ControllerBase
   private readonly IGtfsService _gtfsService;
   private readonly CacheOptions _cacheOptions;
 
-  public GtfsDataController(ILogger<GtfsDataController> logger, IGtfsService gtfsService, CacheOptions cacheOptions)
+  public GtfsDataController(ILogger<GtfsDataController> logger, IGtfsService gtfsService, IOptions<CacheOptions> cacheOptions)
   {
     _logger = logger;
     _gtfsService = gtfsService;
-    _cacheOptions = cacheOptions;
+    _cacheOptions = cacheOptions.Value;
   }
 
   #region Realtime Data Retrieval
