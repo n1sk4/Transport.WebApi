@@ -1,6 +1,10 @@
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using Serilog;
 using System.Text.Json.Serialization;
 using Transport.WebApi.Options;
+using Transport.WebApi.Services;
+using Transport.WebApi.Services.Caching;
 
 internal class Program
 {
@@ -32,13 +36,53 @@ internal class Program
 
   private static void ConfigureServices(WebApplicationBuilder builder)
   {
+    // Configuration
     builder.Services.Configure<GtfsOptions>(builder.Configuration.GetSection("Gtfs"));
-    builder.Services.AddHttpClient<Transport.WebApi.Services.GtfsDataService>();
-    builder.Services.AddScoped<Transport.WebApi.Services.GtfsService>();
+
+    // Memory Cache
+    builder.Services.Configure<CacheOptions>(builder.Configuration.GetSection("Cache"));
+    builder.Services.AddMemoryCache();
+    builder.Services.AddSingleton<IConfigureOptions<MemoryCacheOptions>, ConfigureMemoryCacheOptions>();
+
+    // Cache Services
+    builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
+
+    // HTTP Client for GTFS data
+    builder.Services.AddHttpClient<GtfsDataService>(client =>
+    {
+      client.Timeout = TimeSpan.FromSeconds(30);
+      client.DefaultRequestHeaders.Add("User-Agent", "Transport.WebApi/1.0");
+    });
+
+    // Core Services (base implementations)
+    builder.Services.AddScoped<GtfsDataService>();
+    builder.Services.AddScoped<GtfsService>();
+
+    // Cached Service Decorators
+    builder.Services.AddScoped<IGtfsDataService>(provider =>
+    {
+      var baseService = provider.GetRequiredService<GtfsDataService>();
+      var cacheService = provider.GetRequiredService<ICacheService>();
+      var cacheOptions = provider.GetRequiredService<IOptions<CacheOptions>>().Value;
+      var logger = provider.GetRequiredService<ILogger<CachedGtfsDataService>>();
+      return new CachedGtfsDataService(baseService, cacheService, cacheOptions, logger);
+    });
+
+    builder.Services.AddScoped<IGtfsService>(provider =>
+    {
+      var baseService = provider.GetRequiredService<GtfsService>();
+      var cacheService = provider.GetRequiredService<ICacheService>();
+      var cacheOptions = provider.GetRequiredService<IOptions<CacheOptions>>().Value;
+      var logger = provider.GetRequiredService<ILogger<CachedGtfsService>>();
+      return new CachedGtfsService(baseService, cacheService, cacheOptions, logger);
+    });
+
+    // Controllers and API configuration
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
       options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
+
     builder.Services.AddEndpointsApiExplorer();
   }
 
@@ -46,8 +90,12 @@ internal class Program
   {
     builder.Services.AddSwaggerGen(c =>
     {
-      c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "Transport API", Version = "v1" });
-      c.CustomSchemaIds(type => type.FullName);
+      c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+      {
+        Title = "Transport API",
+        Version = "v1",
+        Description = "GTFS Realtime and Static Data API"
+      });
       c.UseInlineDefinitionsForEnums();
     });
   }
@@ -57,7 +105,11 @@ internal class Program
     if (app.Environment.IsDevelopment())
     {
       app.UseSwagger();
-      app.UseSwaggerUI();
+      app.UseSwaggerUI(c =>
+      {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Transport API v1");
+        c.RoutePrefix = "swagger";
+      });
     }
 
     app.UseHttpsRedirection();
