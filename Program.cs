@@ -1,3 +1,4 @@
+using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -77,6 +78,21 @@ internal class Program
       return new CachedGtfsService(baseService, cacheService, cacheOptions, logger);
     });
 
+    // CORS Configuration - ADD THIS HERE (before builder.Build())
+    builder.Services.AddCors(options =>
+    {
+      options.AddPolicy("AllowLocalDevelopment", policy =>
+      {
+        policy.WithOrigins(
+            "http://localhost:8000",
+            "http://localhost:3000",
+            "http://127.0.0.1:8000"
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader();
+      });
+    });
+
     // Controllers and API configuration
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
@@ -110,6 +126,7 @@ internal class Program
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Transport API v1");
         c.RoutePrefix = "swagger";
       });
+      app.UseCors("AllowLocalDevelopment");
     }
 
     app.UseHttpsRedirection();

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Route 206 Bus Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; width: 100%; }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+<script>
+  const routeId = 206;
+  const apiUrl = `https://localhost:7191/api/GtfsData/GetAllVehiclePositionsByRouteId?routeId=${routeId}`;
+  let vehicleMarkers = [];
+
+  // Initialize the map centered near Zagreb (based on coordinates provided)
+  const map = L.map('map').setView([45.83, 16.05], 14);
+
+  // Add OpenStreetMap tiles
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // Function to fetch and plot vehicle positions
+  async function fetchAndRenderVehicles() {
+    try {
+      const response = await fetch(apiUrl);
+      const vehicles = await response.json();
+
+      // Remove existing markers
+      vehicleMarkers.forEach(marker => map.removeLayer(marker));
+      vehicleMarkers = [];
+
+      // Plot new markers
+      vehicles.forEach((v, index) => {
+        if (v.hasLatitude && v.hasLongitude) {
+          const marker = L.marker([v.latitude, v.longitude])
+            .addTo(map)
+            .bindPopup(`Bus #${index + 1}<br>Lat: ${v.latitude}<br>Lng: ${v.longitude}`);
+          vehicleMarkers.push(marker);
+        }
+      });
+
+    } catch (error) {
+      console.error('Error fetching vehicle positions:', error);
+    }
+  }
+
+  // Initial load
+  fetchAndRenderVehicles();
+
+  // Refresh every 1 second
+  setInterval(fetchAndRenderVehicles, 1000);
+</script>
+
+</body>
+</html>

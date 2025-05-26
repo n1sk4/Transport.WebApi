@@ -66,6 +66,19 @@ public class GtfsService
       .ToArray();
   }
 
+  public async Task<List<Position>> GetAllVehiclePositionsByRouteId(string routeId)
+  {
+    FeedMessage feedMessage = await GetAllRealtimeData();
+    return feedMessage.Entity
+        .Where(entity =>
+            entity.Vehicle != null &&
+            entity.Vehicle.Position != null &&
+            entity.Vehicle.Trip != null &&
+            entity.Vehicle.Trip.RouteId == routeId)
+        .Select(entity => entity.Vehicle.Position)
+        .ToList();
+  }
+
   #endregion
 
   #region Static Data Retrieval

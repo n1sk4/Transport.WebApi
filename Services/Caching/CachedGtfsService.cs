@@ -70,6 +70,20 @@ public class CachedGtfsService : IGtfsService
     );
   }
 
+  public async Task<List<Position>> GetAllVehiclePositionsByRouteId(string routeId)
+  {
+    var cacheKey = CacheKeyGenerator.GetAllVehiclePositionsByRouteIdKey();
+    return await _cacheService.GetOrSetAsync(
+      cacheKey,
+      async () =>
+      {
+        _logger.LogDebug("Fetching all vehicle positions from source");
+        return await _baseService.GetAllVehiclePositionsByRouteId(routeId);
+      },
+      _cacheOptions.RealtimeCacheSeconds
+    );
+  }
+
   public async Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName)
   {
     // Static data caching is handled at the data service level

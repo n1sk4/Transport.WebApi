@@ -25,7 +25,7 @@ public class GtfsDataController : ControllerBase
   #region Realtime Data Retrieval
 
   /// <summary>
-  /// Gets all current vehicle positions (cached for 30 seconds)
+  /// Gets all vehicles (cached for 30 seconds)
   /// </summary>
   [HttpGet("GetAllVehicles")]
   [ProducesResponseType(200)]
@@ -124,6 +124,35 @@ public class GtfsDataController : ControllerBase
     {
       _logger.LogError(ex, "Error retrieving vehicles for route {RouteId}", routeId);
       return StatusCode(500, "Internal server error while retrieving vehicles for route");
+    }
+  }
+
+  /// <summary>
+  /// Gets all vehicle positions (cached for 30 seconds)
+  /// </summary>
+  [HttpGet("GetAllVehiclePositionsByRouteId")]
+  [ProducesResponseType(200)]
+  [ProducesResponseType(204)]
+  [ProducesResponseType(400)]
+  [ProducesResponseType(500)]
+  public async Task<IActionResult> GetAllVehiclePositionsByRouteId([Required] string routeId)
+  {
+    try
+    {
+      _logger.LogDebug("GetAllVehiclePositions called");
+      var feedEntity = await _gtfsService.GetAllVehiclePositionsByRouteId(routeId);
+      if (feedEntity != null)
+      {
+        _logger.LogInformation("Retrieved vehicle positions");
+        return Ok(feedEntity);
+      }
+      _logger.LogInformation("No vehicle positions found");
+      return NoContent();
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Error retrieving all vehicle positions");
+      return StatusCode(500, "Internal server error while retrieving vehicle positions");
     }
   }
 
