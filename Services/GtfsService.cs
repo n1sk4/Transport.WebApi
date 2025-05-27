@@ -79,6 +79,23 @@ public class GtfsService
         .ToList();
   }
 
+  public async Task<Dictionary<string, List<Position>>> GetAllVehiclePositions()
+  {
+    FeedMessage feedMessage = await GetAllRealtimeData();
+    var result = feedMessage.Entity
+        .Where(entity => entity.Vehicle != null &&
+                         entity.Vehicle.Position != null &&
+                         entity.Vehicle.Trip != null &&
+                         !string.IsNullOrEmpty(entity.Vehicle.Trip.RouteId))
+        .GroupBy(entity => entity.Vehicle.Trip.RouteId)
+        .ToDictionary(
+            g => g.Key,
+            g => g.Select(entity => entity.Vehicle.Position).ToList()
+        );
+
+    return result;
+  }
+
   #endregion
 
   #region Static Data Retrieval

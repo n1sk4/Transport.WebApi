@@ -11,6 +11,7 @@ public interface IGtfsService
   Task<FeedEntity?> GetAVehicleById(string vehicleId);
   Task<FeedEntity[]> GetAllVehiclesByRoute(string routeId);
   Task<List<Position>> GetAllVehiclePositionsByRouteId(string routeId);
+  Task<Dictionary<string, List<Position>>> GetAllVehiclePositions();
   Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName);
   Task<List<string>> GetRouteShape(string routeId);
 }

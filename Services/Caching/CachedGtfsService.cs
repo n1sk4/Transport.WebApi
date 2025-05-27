@@ -84,6 +84,20 @@ public class CachedGtfsService : IGtfsService
     );
   }
 
+  public async Task<Dictionary<string, List<Position>>> GetAllVehiclePositions()
+  {
+    var cacheKey = CacheKeyGenerator.GetAllVehiclesKey();
+    return await _cacheService.GetOrSetAsync(
+      cacheKey,
+      async () =>
+      {
+        _logger.LogDebug("Fetching all vehicle positions from source");
+        return await _baseService.GetAllVehiclePositions();
+      },
+      _cacheOptions.RealtimeCacheSeconds
+    );
+  }
+
   public async Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName)
   {
     // Static data caching is handled at the data service level
