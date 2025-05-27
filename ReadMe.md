@@ -6,7 +6,7 @@
 ### Simple UI
 [More info in WebClients folder](WebClients/simple-client/ReadMe.md)
 
-![](Webclients/simple-client/image.png?raw=true)
+![Image](Webclients/simple-client/image.png?raw=true)
 
 ## Description
 Web API for getting the GTFS (General Transit Feed Specification) data
