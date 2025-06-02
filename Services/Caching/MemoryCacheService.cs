@@ -37,11 +37,13 @@ public class MemoryCacheService : ICacheService
   {
     try
     {
+      int size = (value is ICollection<T> collection) ? collection.Count : 1;
       var cacheOptions = new MemoryCacheEntryOptions
       {
         AbsoluteExpirationRelativeToNow = expiration,
         SlidingExpiration = null, // No sliding expiration for GTFS data
-        Priority = CacheItemPriority.Normal
+        Priority = CacheItemPriority.Normal,
+        Size = size
       };
 
       _memoryCache.Set(key, value, cacheOptions);

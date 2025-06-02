@@ -72,7 +72,7 @@ public class CachedGtfsService : IGtfsService
 
   public async Task<List<Position>> GetAllVehiclePositionsByRouteId(string routeId)
   {
-    var cacheKey = CacheKeyGenerator.GetAllVehiclePositionsByRouteIdKey();
+    var cacheKey = CacheKeyGenerator.GetAllVehiclePositionsByRouteIdKey(routeId);
     return await _cacheService.GetOrSetAsync(
       cacheKey,
       async () =>

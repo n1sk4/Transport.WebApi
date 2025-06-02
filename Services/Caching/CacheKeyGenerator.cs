@@ -1,3 +1,4 @@
+using System.Reflection.Metadata;
 using Transport.WebApi.Options;
 
 namespace Transport.WebApi.Services.Caching;
@@ -18,8 +19,8 @@ public static class CacheKeyGenerator
   public static string GetVehiclesByRouteKey(string routeId)
     => $"gtfs:realtime:route:{routeId}";
 
-  public static string GetAllVehiclePositionsByRouteIdKey()
-    => "gtfs:realtime:vehicles:positions";
+  public static string GetAllVehiclePositionsByRouteIdKey(string routeId)
+    => $"gtfs:realtime:vehicles:positions:{routeId}";
 
   public static string GetAllVehiclesKey()
     => "gtfs:realtime:vehicles:all";
