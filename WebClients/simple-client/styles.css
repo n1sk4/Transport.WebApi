@@ -1,0 +1,247 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 400px;
+  background: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.controls {
+  padding: 20px;
+  background: white;
+  margin: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.controls h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.control-group {
+  margin-bottom: 15px;
+}
+
+.control-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #555;
+}
+
+.controls input, .controls select {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.controls input:focus, .controls select:focus {
+  outline: none;
+  border-color: #007cff;
+}
+
+.input-group {
+  display: flex;
+  gap: 5px;
+  align-items: flex-end;
+}
+
+.input-group input, .input-group select {
+  flex: 1;
+}
+
+.add-button {
+  width: 40px;
+  height: 42px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-button:hover {
+  background: #218838;
+}
+
+.add-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.controls button {
+  flex: 1;
+  padding: 12px;
+  background: #007cff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.controls button:hover {
+  background: #0056b3;
+}
+
+.controls button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.controls button.secondary {
+  background: #6c757d;
+}
+
+.controls button.secondary:hover {
+  background: #545b62;
+}
+
+.tracked-routes {
+  margin-top: 20px;
+}
+
+.tracked-routes h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.route-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.route-item:hover {
+  background: #f8f9fa;
+  border-color: #007cff;
+}
+
+.route-item.active {
+  background: #e3f2fd;
+  border-color: #007cff;
+}
+
+.route-info {
+  flex: 1;
+}
+
+.route-number {
+  font-weight: bold;
+  color: #007cff;
+}
+
+.route-name {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+.vehicle-count {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.visibility-toggle {
+  width: 16px;
+  height: 16px;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.remove-button {
+  width: 24px;
+  height: 24px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-button:hover {
+  background: #c82333;
+}
+
+.status {
+  margin: 15px;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 14px;
+  display: none;
+}
+
+.status.error {
+  background: #ffe6e6;
+  color: #cc0000;
+  border: 1px solid #ffcccc;
+}
+
+.status.success {
+  background: #e6ffe6;
+  color: #006600;
+  border: 1px solid #ccffcc;
+}
+
+.status.loading {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+}
+
+#map { 
+  height: 100%;
+  width: 100%;
+}
+
+.route-select-option {
+  padding: 5px 0;
+}
