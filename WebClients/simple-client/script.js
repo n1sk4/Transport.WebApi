@@ -1,6 +1,6 @@
 // Configuration
-const apiBaseUrl = 'https://localhost:7191/api/GtfsData/GetAllVehiclePositionsByRouteId';
-const routesApiUrl = 'https://localhost:7191/api/GtfsData/GetAllStaticFileData?fileName=RoutesFile';
+const apiBaseUrl = '/api/GtfsData/GetAllVehiclePositionsByRouteId';
+const routesApiUrl = '/api/GtfsData/GetAllStaticFileData?fileName=RoutesFile';
 
 // Global variables
 let trackedRoutes = new Map(); // Map of routeId -> {markers: [], interval: intervalId, vehicleCount: 0, visible: true, name: ''}
