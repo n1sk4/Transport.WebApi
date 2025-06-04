@@ -28,6 +28,10 @@ jobs:
         with:
           version: '25.3'
 
+      - name: Generate GtfsRealtime.cs
+        run: protoc --csharp_out=Services/Generated Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto
+        shell: bash
+
       - name: Build with dotnet
         run: dotnet build --configuration Release
 
