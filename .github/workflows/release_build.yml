@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout code
@@ -43,12 +43,12 @@ jobs:
       - name: Publish Release
         run: dotnet publish --configuration Release --output ./publish
 
-      - name: Compress Release Artifacts
+      - name: Compress Release Artifacts (Windows)
         if: runner.os == 'Windows'
         run: Compress-Archive -Path ./publish/* -DestinationPath ./release-windows.zip
         shell: pwsh
 
-      - name: Compress Release Artifacts (Linux/macOS)
+      - name: Compress Release Artifacts (Linux)
         if: runner.os != 'Windows'
         run: zip -r release-${{ runner.os }}.zip ./publish
 
