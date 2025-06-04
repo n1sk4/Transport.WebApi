@@ -149,23 +149,17 @@ internal class Program
     app.UseHttpsRedirection();
 
     var clientPath = Path.Combine(Directory.GetCurrentDirectory(), "WebClients", "simple-client");
-    if (Directory.Exists(clientPath))
+
+    app.UseDefaultFiles(new DefaultFilesOptions
     {
-      app.UseDefaultFiles(new DefaultFilesOptions
-      {
-        FileProvider = new PhysicalFileProvider(clientPath),
-        RequestPath = ""
-      });
-      app.UseStaticFiles(new StaticFileOptions
-      {
-        FileProvider = new PhysicalFileProvider(clientPath),
-        RequestPath = ""
-      });
-    }
-    else
+      FileProvider = new PhysicalFileProvider(clientPath),
+      RequestPath = ""
+    });
+    app.UseStaticFiles(new StaticFileOptions
     {
-      app.MapGet("/", () => Results.Redirect("/swagger"));
-    }
+      FileProvider = new PhysicalFileProvider(clientPath),
+      RequestPath = ""
+    });
 
     app.MapGet("/health", () => "OK");
 
