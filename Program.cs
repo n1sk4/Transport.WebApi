@@ -142,7 +142,7 @@ internal class Program
       app.UseSwaggerUI(c =>
       {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Transport API v1");
-        c.RoutePrefix = "";
+        c.RoutePrefix = "swagger";
       });
     }
 

@@ -34,10 +34,13 @@ jobs:
         run: protoc --csharp_out=Services/Generated Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto
         shell: bash
 
-      - name: Build with dotnet
+      - name: Clean
+        run: dotnet clean
+
+      - name: Build
         run: dotnet build --configuration Release
 
-      - name: dotnet publish
+      - name: Publish
         run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
 
       - name: Upload artifact for deployment job

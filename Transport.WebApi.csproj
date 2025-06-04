@@ -21,7 +21,10 @@
   </ItemGroup>
 
   <ItemGroup>
-  <Content Include="WebClients\simple-client\**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="WebClients\simple-client\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="GenerateProtobuf" BeforeTargets="BeforeBuild" Inputs="Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto" Outputs="Services/Generated/GtfsRealtime.cs" Condition="'$(Configuration)' == 'DebugWProtoGen' Or '$(Configuration)' == 'ReleaseWProtoGen'">
