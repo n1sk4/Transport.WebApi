@@ -20,6 +20,10 @@
     <Folder Include="Services\Generated\" />
   </ItemGroup>
 
+  <ItemGroup>
+  <Content Include="WebClients\simple-client\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <Target Name="GenerateProtobuf" BeforeTargets="BeforeBuild" Inputs="Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto" Outputs="Services/Generated/GtfsRealtime.cs" Condition="'$(Configuration)' == 'DebugWProtoGen' Or '$(Configuration)' == 'ReleaseWProtoGen'">
     <Exec Command="protoc --csharp_out=Services/Generated Vendor/transit/gtfs-realtime/proto/gtfs-realtime.proto" WorkingDirectory="$(ProjectDir)" />
   </Target>

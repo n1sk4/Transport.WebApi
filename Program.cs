@@ -136,6 +136,15 @@ internal class Program
       });
       app.UseCors("AllowLocalDevelopment");
     }
+    else
+    {
+      app.UseSwagger();
+      app.UseSwaggerUI(c =>
+      {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Transport API v1");
+        c.RoutePrefix = "";
+      });
+    }
 
     app.UseHttpsRedirection();
 
@@ -153,6 +162,12 @@ internal class Program
         RequestPath = ""
       });
     }
+    else
+    {
+      app.MapGet("/", () => Results.Redirect("/swagger"));
+    }
+
+    app.MapGet("/health", () => "OK");
 
     app.UseAuthorization();
     app.MapControllers();
