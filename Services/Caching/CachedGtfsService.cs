@@ -43,15 +43,13 @@ public class CachedGtfsService : IGtfsService
     var cacheKey = CacheKeyGenerator.GetVehicleByIdKey(vehicleId);
 
     return await _cacheService.GetOrSetAsync<FeedEntity>(
-        cacheKey,
-        async () =>
-        {
-          _logger.LogDebug("Fetching vehicle {VehicleId} from source", vehicleId);
-#pragma warning disable CS8603 // Possible null reference return.
-          return await _baseService.GetAVehicleById(vehicleId);
-#pragma warning restore CS8603 // Possible null reference return.
-        },
-        _cacheOptions.RealtimeCacheSeconds
+      cacheKey,
+      async () =>
+      {
+        _logger.LogDebug("Fetching vehicle {VehicleId} from source", vehicleId);
+        return await _baseService.GetAVehicleById(vehicleId) ?? new FeedEntity();
+      },
+      _cacheOptions.RealtimeCacheSeconds
     );
   }
 
