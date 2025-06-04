@@ -1,5 +1,6 @@
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Serilog;
 using System.Text.Json.Serialization;
@@ -24,6 +25,7 @@ internal class Program
     app.Run();
   }
 
+  #region Logging Configuration
   private static void ConfigureLogging(WebApplicationBuilder builder)
   {
     Log.Logger = new LoggerConfiguration()
@@ -34,7 +36,9 @@ internal class Program
         .CreateLogger();
     builder.Host.UseSerilog();
   }
+  #endregion
 
+  #region Service Configuration
   private static void ConfigureServices(WebApplicationBuilder builder)
   {
     // Configuration
@@ -101,7 +105,9 @@ internal class Program
 
     builder.Services.AddEndpointsApiExplorer();
   }
+  #endregion
 
+  #region Swagger Configuration
   private static void ConfigureSwagger(WebApplicationBuilder builder)
   {
     builder.Services.AddSwaggerGen(c =>
@@ -115,7 +121,9 @@ internal class Program
       c.UseInlineDefinitionsForEnums();
     });
   }
+  #endregion
 
+  #region Middleware Configuration
   private static void ConfigureMiddleware(WebApplication app)
   {
     if (app.Environment.IsDevelopment())
@@ -130,7 +138,24 @@ internal class Program
     }
 
     app.UseHttpsRedirection();
+
+    var clientPath = Path.Combine(Directory.GetCurrentDirectory(), "WebClients", "simple-client");
+    if (Directory.Exists(clientPath))
+    {
+      app.UseDefaultFiles(new DefaultFilesOptions
+      {
+        FileProvider = new PhysicalFileProvider(clientPath),
+        RequestPath = ""
+      });
+      app.UseStaticFiles(new StaticFileOptions
+      {
+        FileProvider = new PhysicalFileProvider(clientPath),
+        RequestPath = ""
+      });
+    }
+
     app.UseAuthorization();
     app.MapControllers();
   }
+  #endregion
 }

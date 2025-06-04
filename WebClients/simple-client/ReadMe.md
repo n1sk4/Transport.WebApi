@@ -1,5 +1,5 @@
 # Simple UI to represent the data
-## Run with python
+## Run standalone with python
 ```bash
 # change to client folder
 cd \WebClients\simple-client
