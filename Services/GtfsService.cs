@@ -48,20 +48,24 @@ public class GtfsService
     }
   }
 
-  public async Task<List<string>> GetAllRoutes()
+  public async Task<List<JsonSerializedRoutes>> GetAllRoutes()
   {
     var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.RoutesFile);
     if (fileData.Count > 0)
     {
-      var routes = fileData.SelectMany(line => line.Split('\n'))
-          .Where(line => !string.IsNullOrWhiteSpace(line))
-          .Select(line =>
+      return fileData
+        .Select(line =>
+        {
+          var parts = line.Split(',');
+          return new JsonSerializedRoutes()
           {
-            var parts = line.Split(',');
-            return $"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{(parts.Length > 4 ? parts[4] : string.Empty)},{(parts.Length > 5 ? parts[5] : string.Empty)}";
-          })
-          .ToList();
-      return routes;
+            RouteId = parts.Length > 0 ? parts[0] : string.Empty,
+            RouteShortName = parts.Length > 2 ? parts[2].Replace("\"", string.Empty) : string.Empty,
+            RouteLongName = parts.Length > 3 ? parts[3].Replace("\"", string.Empty) : string.Empty,
+            RouteType = parts.Length > 5 ? parts[5] : string.Empty
+          };
+        })
+        .ToList();
     }
     else
     {

@@ -59,7 +59,7 @@ public class CachedGtfsService : IGtfsService
     return await _baseService.GetAllStaticFileData(fileName);
   }
 
-  public async Task<List<string>> GetAllRoutes()
+  public async Task<List<JsonSerializedRoutes>> GetAllRoutes()
   {
     var cacheKey = CacheKeyGenerator.GetAllRoutesKey();
     return await _cacheService.GetOrSetAsync(
