@@ -73,7 +73,7 @@ public class CachedGtfsService : IGtfsService
     );
   }
 
-  public async Task<List<string>> GetRouteShape(string routeId)
+  public async Task<List<JsonSerializedRouteShapes>> GetRouteShape(string routeId)
   {
     var cacheKey = CacheKeyGenerator.GetRouteShapeKey(routeId);
 

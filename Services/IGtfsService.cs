@@ -12,6 +12,6 @@ public interface IGtfsService
   #region Static Data Retrieval
   Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName);
   Task<List<JsonSerializedRoutes>> GetAllRoutes();
-  Task<List<string>> GetRouteShape(string routeId);
+  Task<List<JsonSerializedRouteShapes>> GetRouteShape(string routeId);
   #endregion
 }

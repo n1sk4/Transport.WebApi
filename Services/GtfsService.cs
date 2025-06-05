@@ -73,20 +73,30 @@ public class GtfsService
     }
   }
 
-  public async Task<List<string>> GetRouteShape(string routeId)
+  public async Task<List<JsonSerializedRouteShapes>> GetRouteShape(string routeId)
   {
     var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.ShapesFile);
     if (fileData.Count > 0)
     {
-      var routeShape = fileData
-          .Where(line => line.Contains(routeId))
-          .Select(line =>
+      return fileData
+        .Where(line =>
+        {
+          var parts = line.Split(',');
+          if (parts.Length == 0) return false;
+          // parts[0] is like "1_1"
+          var shapeId = parts[0];
+          return shapeId.StartsWith($"{routeId}_");
+        })
+        .Select(line =>
+        {
+          var parts = line.Split(",");
+          return new JsonSerializedRouteShapes()
           {
-            var parts = line.Split(',');
-            return parts.Length > 1 ? string.Join(",", parts.Skip(1)) : string.Empty;
-          })
-          .ToList();
-      return routeShape;
+            Latitude = parts.Length > 1 ? (parts[1]) : "0.0",
+            Longitude = parts.Length > 2 ? (parts[2]) : "0.0",
+          };
+        })
+        .ToList();
     }
     else
     {
