@@ -84,7 +84,7 @@ public class GtfsService
           var parts = line.Split(',');
           if (parts.Length == 0) return false;
           // parts[0] is like "1_1"
-          var shapeId = parts[0];
+          var shapeId = parts[0].Replace("\"", string.Empty);
           return shapeId.StartsWith($"{routeId}_");
         })
         .Select(line =>
