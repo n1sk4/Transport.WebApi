@@ -48,6 +48,27 @@ public class GtfsService
     }
   }
 
+  public async Task<List<string>> GetAllRoutes()
+  {
+    var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.RoutesFile);
+    if (fileData.Count > 0)
+    {
+      var routes = fileData.SelectMany(line => line.Split('\n'))
+          .Where(line => !string.IsNullOrWhiteSpace(line))
+          .Select(line =>
+          {
+            var parts = line.Split(',');
+            return $"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{(parts.Length > 4 ? parts[4] : string.Empty)},{(parts.Length > 5 ? parts[5] : string.Empty)}";
+          })
+          .ToList();
+      return routes;
+    }
+    else
+    {
+      throw new InvalidDataException("No route data available.");
+    }
+  }
+
   public async Task<List<string>> GetRouteShape(string routeId)
   {
     var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.ShapesFile);

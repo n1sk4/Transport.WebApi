@@ -59,6 +59,20 @@ public class CachedGtfsService : IGtfsService
     return await _baseService.GetAllStaticFileData(fileName);
   }
 
+  public async Task<List<string>> GetAllRoutes()
+  {
+    var cacheKey = CacheKeyGenerator.GetAllRoutesKey();
+    return await _cacheService.GetOrSetAsync(
+      cacheKey,
+      async () =>
+      {
+        _logger.LogDebug("Fetching all routes from source");
+        return await _baseService.GetAllRoutes();
+      },
+      _cacheOptions.StaticCacheHours
+    );
+  }
+
   public async Task<List<string>> GetRouteShape(string routeId)
   {
     var cacheKey = CacheKeyGenerator.GetRouteShapeKey(routeId);
@@ -70,7 +84,7 @@ public class CachedGtfsService : IGtfsService
         _logger.LogDebug("Fetching route shape for {RouteId} from source", routeId);
         return await _baseService.GetRouteShape(routeId);
       },
-      _cacheOptions.RealtimeCacheSeconds
+      _cacheOptions.StaticCacheHours
     );
   }
   #endregion
