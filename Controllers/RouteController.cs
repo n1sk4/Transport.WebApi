@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using Transport.WebApi.Models;
 using Transport.WebApi.Services;
 
 namespace Transport.WebApi.Controllers;
@@ -22,10 +23,10 @@ public class RouteController : ControllerBase
   /// Gets all available routes (cached for 24 hours)
   /// </summary>
   [HttpGet("AllRoutes")]
-  [ProducesResponseType(200)]
+  [ProducesResponseType(200, Type = typeof(JsonSerializedRoutes))]
   [ProducesResponseType(404)]
   [ProducesResponseType(500)]
-  public async Task<IActionResult> GetAllRoutes()
+  public async Task<ActionResult<JsonSerializedRoutes>> GetAllRoutes()
   {
     try
     {
@@ -50,11 +51,11 @@ public class RouteController : ControllerBase
   /// Gets route shape data for a specific route (cached for 24 hours)
   /// </summary>
   [HttpGet("RouteShape")]
-  [ProducesResponseType(200)]
+  [ProducesResponseType(200, Type = typeof(JsonSerializedRouteShapes))]
   [ProducesResponseType(404)]
   [ProducesResponseType(400)]
   [ProducesResponseType(500)]
-  public async Task<IActionResult> GetRouteShape([Required] string routeId)
+  public async Task<ActionResult<JsonSerializedRouteShapes>> GetRouteShape([Required] string routeId)
   {
     if (string.IsNullOrWhiteSpace(routeId))
     {

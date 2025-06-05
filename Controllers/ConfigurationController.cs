@@ -20,7 +20,7 @@ public class ConfigurationController : ControllerBase
   /// Returns the current configuration settings of the API
   /// </summary>
   [HttpGet]
-  [ProducesResponseType(200)]
+  [ProducesResponseType(200, Type = typeof(ApiConfiguration))]
   [ProducesResponseType(500)]
   public ActionResult<ApiConfiguration> GetApiConfiguration()
   {

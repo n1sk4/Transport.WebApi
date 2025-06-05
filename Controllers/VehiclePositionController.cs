@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Transport.WebApi.Models;
 using Transport.WebApi.Services;
 
 namespace Transport.WebApi.Controllers;
@@ -20,10 +21,10 @@ public class VehiclePositionController : ControllerBase
   /// Gets the current positions of all vehicles
   /// </summary>
   [HttpGet("CurrentPositions")]
-  [ProducesResponseType(200)]
+  [ProducesResponseType(200, Type = typeof(List<VehicleCurrentPosition>))]
   [ProducesResponseType(404)]
   [ProducesResponseType(500)]
-  public async Task<IActionResult> GetCurrentVehiclePositions()
+  public async Task<ActionResult<List<VehicleCurrentPosition>>> GetCurrentVehiclePositions()
   {
     try
     {
@@ -48,10 +49,10 @@ public class VehiclePositionController : ControllerBase
   /// Gets the current position of a vehicle by its route
   /// </summary>
   [HttpGet("CurrentPositionByRoute")]
-  [ProducesResponseType(200)]
+  [ProducesResponseType(200, Type = typeof(List<VehicleCurrentPosition>))]
   [ProducesResponseType(404)]
   [ProducesResponseType(500)]
-  public async Task<IActionResult> GetCurrentVehiclePositionByRoute([FromQuery] string routeId)
+  public async Task<ActionResult<List<VehicleCurrentPosition>>> GetCurrentVehiclePositionByRoute([FromQuery] string routeId)
   {
     try
     {

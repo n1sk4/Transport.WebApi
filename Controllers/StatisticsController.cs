@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Transport.WebApi.Models;
 using Transport.WebApi.Options;
 using Transport.WebApi.Services;
 
@@ -47,8 +48,8 @@ public class StatisticsController : ControllerBase
   /// Gets cache statistics
   /// </summary>
   [HttpGet("cache/stats")]
-  [ProducesResponseType(200)]
-  public IActionResult GetCacheStats()
+  [ProducesResponseType(200, Type = typeof(CacheConfiguration))]
+  public ActionResult<CacheConfiguration> GetCacheStats()
   {
     if (!HttpContext.RequestServices.GetService<IWebHostEnvironment>()?.IsDevelopment() ?? false)
     {
@@ -57,7 +58,7 @@ public class StatisticsController : ControllerBase
 
     var stats = new
     {
-      CacheConfiguration = new
+      CacheConfiguration = new CacheConfiguration
       {
         RealtimeCacheSeconds = _cacheOptions.RealtimeCacheSeconds,
         StaticCacheHours = _cacheOptions.StaticCacheHours,
