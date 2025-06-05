@@ -83,17 +83,29 @@ public class GtfsService
         {
           var parts = line.Split(',');
           if (parts.Length == 0) return false;
-          // parts[0] is like "1_1"
           var shapeId = parts[0].Replace("\"", string.Empty);
           return shapeId.StartsWith($"{routeId}_");
         })
         .Select(line =>
         {
           var parts = line.Split(",");
+          string directionValue = string.Empty;
+          if (parts.Length > 0)
+          {
+            var shapeId = parts[0].Replace("\"", string.Empty);
+            var underscoreIndex = shapeId.IndexOf('_');
+            if (underscoreIndex >= 0 && shapeId.Length > underscoreIndex + 1)
+            {
+              var dirChar = shapeId[underscoreIndex + 1];
+              directionValue = dirChar == '1' ? "outbound" :
+                                    dirChar == '2' ? "inbound" : string.Empty;
+            }
+          }
           return new JsonSerializedRouteShapes()
           {
-            Latitude = parts.Length > 1 ? (parts[1]) : "0.0",
-            Longitude = parts.Length > 2 ? (parts[2]) : "0.0",
+            Direction = directionValue,
+            Latitude = parts.Length > 1 ? parts[1] : "0.0",
+            Longitude = parts.Length > 2 ? parts[2] : "0.0",
           };
         })
         .ToList();
