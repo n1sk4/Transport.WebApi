@@ -4,6 +4,10 @@ namespace Transport.WebApi.Services;
 
 public interface IGtfsDataService
 {
-  Task<List<string>> GetStaticFileDataAsync(GtfsStaticDataFile fileName);
+  #region Realtime Data Retrieval
   Task<byte[]> GetRealtimeDataAsync();
+  #endregion
+  #region Static Data Retrieval
+  Task<List<string>> GetStaticFileDataAsync(GtfsStaticDataFile fileName);
+  #endregion
 }

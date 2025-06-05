@@ -18,6 +18,27 @@ public class GtfsDataService
     _logger = logger;
   }
 
+  #region Realtime Data Retrieval
+  public async Task<byte[]> GetRealtimeDataAsync()
+  {
+    try
+    {
+      _logger.LogDebug("Fetching realtime GTFS data.");
+      var response = await _httpClient.GetAsync(_gtfsOptions.RealtimeDataEndpoint);
+      response.EnsureSuccessStatusCode();
+      var content = await response.Content.ReadAsByteArrayAsync();
+      _logger.LogDebug("Successfully fetched realtime GTFS data.");
+      return content;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Error fetching realtime GTFS data.");
+      throw;
+    }
+  }
+  #endregion
+
+  #region Static Data Retrieval
   public async Task<List<string>> GetStaticFileDataAsync(GtfsStaticDataFile fileName)
   {
     try
@@ -57,23 +78,5 @@ public class GtfsDataService
       return new List<string>();
     }
   }
-
-
-  public async Task<byte[]> GetRealtimeDataAsync()
-  {
-    try
-    {
-      _logger.LogDebug("Fetching realtime GTFS data.");
-      var response = await _httpClient.GetAsync(_gtfsOptions.RealtimeDataEndpoint);
-      response.EnsureSuccessStatusCode();
-      var content = await response.Content.ReadAsByteArrayAsync();
-      _logger.LogDebug("Successfully fetched realtime GTFS data.");
-      return content;
-    }
-    catch (Exception ex)
-    {
-      _logger.LogError(ex, "Error fetching realtime GTFS data.");
-      throw;
-    }
-  }
+  #endregion
 }

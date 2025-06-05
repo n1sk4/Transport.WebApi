@@ -1,4 +1,5 @@
 using TransitRealtime;
+using Transport.WebApi.Models;
 using Transport.WebApi.Options;
 
 namespace Transport.WebApi.Services;
@@ -15,91 +16,25 @@ public class GtfsService
   }
 
   #region Realtime Data Retrieval
-  public async Task<FeedMessage> GetAllRealtimeData()
+  public async Task<VehicleCurrentPosition> GetAllVechiclesCurrentPositions()
   {
-    byte[] data = await _gtfsDataService.GetRealtimeDataAsync();
-    FeedMessage feedMessage = FeedMessage.Parser.ParseFrom(data);
-    var formatter = new Google.Protobuf.JsonFormatter(new Google.Protobuf.JsonFormatter.Settings(true));
-    var json = formatter.Format(feedMessage);
-
-    return feedMessage;
+    return await GetPositions();
   }
 
-  public async Task<FeedEntity> GetAllDataRealtime()
+  public async Task<VehicleCurrentPosition> GetCurrentVehiclesPositionsByRoute(string routeId)
   {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    if (feedMessage.Entity.Count > 0)
-    {
-      return feedMessage.Entity[0];
-    }
-    else
-    {
-      throw new InvalidDataException("No data available in the feed.");
-    }
-  }
+    var positions = await GetPositions();
 
-  public async Task<FeedEntity[]> GetAllVehicles()
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    return feedMessage.Entity.Where(entity => entity.Vehicle != null).ToArray();
-  }
-
-  public async Task<FeedEntity?> GetAVehicleById(string vehicleId)
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    foreach (var entity in feedMessage.Entity)
-    {
-      if (entity.Vehicle != null && entity.Vehicle.Vehicle.Id == vehicleId)
-      {
-        return entity;
-      }
-    }
-
-    return null;
-  }
-
-  public async Task<FeedEntity[]> GetAllVehiclesByRoute(string routeId)
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    return feedMessage.Entity
-      .Where(entity => entity.Vehicle != null && entity.Vehicle.Trip != null && entity.Vehicle.Trip.RouteId == routeId)
-      .ToArray();
-  }
-
-  public async Task<List<Position>> GetAllVehiclePositionsByRouteId(string routeId)
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    return feedMessage.Entity
-        .Where(entity =>
-            entity.Vehicle != null &&
-            entity.Vehicle.Position != null &&
-            entity.Vehicle.Trip != null &&
-            entity.Vehicle.Trip.RouteId == routeId)
-        .Select(entity => entity.Vehicle.Position)
+    var routePositions = positions
+        .Where(kvp => kvp.Key == routeId)
+        .SelectMany<KeyValuePair<string, object>, string>(kvp => (IEnumerable<string>)kvp.Value)
         .ToList();
+
+    return new VehicleCurrentPosition { { routeId, routePositions } };
   }
-
-  public async Task<Dictionary<string, List<Position>>> GetAllVehiclePositions()
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    var result = feedMessage.Entity
-        .Where(entity => entity.Vehicle != null &&
-                         entity.Vehicle.Position != null &&
-                         entity.Vehicle.Trip != null &&
-                         !string.IsNullOrEmpty(entity.Vehicle.Trip.RouteId))
-        .GroupBy(entity => entity.Vehicle.Trip.RouteId)
-        .ToDictionary(
-            g => g.Key,
-            g => g.Select(entity => entity.Vehicle.Position).ToList()
-        );
-
-    return result;
-  }
-
   #endregion
 
   #region Static Data Retrieval
-
   public async Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName)
   {
     var fileData = await _gtfsDataService.GetStaticFileDataAsync(fileName);
@@ -133,6 +68,43 @@ public class GtfsService
       throw new InvalidDataException($"No shape data available for route {routeId}.");
     }
   }
+  #endregion
 
+  #region Helper Methods
+  private async Task<FeedMessage> GetAllRealtimeData()
+  {
+    byte[] data = await _gtfsDataService.GetRealtimeDataAsync();
+    FeedMessage feedMessage = FeedMessage.Parser.ParseFrom(data);
+    var formatter = new Google.Protobuf.JsonFormatter(new Google.Protobuf.JsonFormatter.Settings(true));
+    var json = formatter.Format(feedMessage);
+
+    return feedMessage;
+  }
+
+  private async Task<VehicleCurrentPosition> GetPositions()
+  {
+    var feedMessage = await GetAllRealtimeData();
+    var vehiclePositions = feedMessage.Entity
+        .Where(e => e.Vehicle != null)
+        .Select(e => e.Vehicle)
+        .ToList();
+    if (vehiclePositions.Count == 0)
+    {
+      throw new InvalidDataException("No vehicle positions available in the realtime data.");
+    }
+
+    var vehiclePositionDict = new VehicleCurrentPosition();
+    foreach (var vehicle in vehiclePositions)
+    {
+      if (!vehiclePositionDict.ContainsKey(vehicle.Trip.RouteId))
+      {
+        vehiclePositionDict[vehicle.Trip.RouteId] = new List<string>();
+      }
+      var position = $"{vehicle.Position.Latitude},{vehicle.Position.Longitude}";
+      ((List<string>)vehiclePositionDict[vehicle.Trip.RouteId]).Add(position);
+    }
+
+    return vehiclePositionDict;
+  }
   #endregion
 }
