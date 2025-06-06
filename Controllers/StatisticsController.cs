@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Transport.WebApi.Models;
 using Transport.WebApi.Options;
-using Transport.WebApi.Services;
 
 namespace Transport.WebApi.Controllers;
 

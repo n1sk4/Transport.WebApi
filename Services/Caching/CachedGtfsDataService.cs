@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Transport.WebApi.Options;
 using Transport.WebApi.Services.Caching;
 using Transport.WebApi.Services.Gtfs;
