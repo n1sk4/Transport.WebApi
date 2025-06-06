@@ -8,6 +8,7 @@ public class GtfsService
 {
   private readonly ILogger<GtfsService> _logger;
   private GtfsDataService _gtfsDataService;
+  private Dictionary<string, JsonSerializedRoutes> _routeCache = new();
 
   public GtfsService(GtfsDataService gtfsDataService, ILogger<GtfsService> logger)
   {
@@ -31,6 +32,110 @@ public class GtfsService
         .ToList();
 
     return new VehicleCurrentPosition { { routeId, routePositions } };
+  }
+
+  private async Task<JsonSerializedRoutes?> GetRouteInfo(string routeId)
+  {
+    if (_routeCache.ContainsKey(routeId))
+    {
+      return _routeCache[routeId];
+    }
+
+    try
+    {
+      var allRoutes = await GetAllRoutes();
+      foreach (var route in allRoutes)
+      {
+        _routeCache[route.RouteId] = route;
+      }
+
+      return _routeCache.ContainsKey(routeId) ? _routeCache[routeId] : null;
+    }
+    catch
+    {
+      return null;
+    }
+  }
+
+  public async Task<List<EnhancedVehiclePosition>> GetAllVehiclesCurrentPositionsEnhanced()
+  {
+    var positions = await GetPositions();
+    var enhancedPositions = new List<EnhancedVehiclePosition>();
+
+    foreach (var routePositions in positions)
+    {
+      var routeId = routePositions.Key;
+      var vehiclePositions = (List<string>)routePositions.Value;
+
+      var routeInfo = await GetRouteInfo(routeId);
+
+      var vehicles = new List<VehiclePositionData>();
+      foreach (var positionStr in vehiclePositions)
+      {
+        var coords = positionStr.Split(',');
+        if (coords.Length >= 2 &&
+            double.TryParse(coords[0], out var lat) &&
+            double.TryParse(coords[1], out var lng))
+        {
+          vehicles.Add(new VehiclePositionData
+          {
+            Latitude = lat,
+            Longitude = lng,
+            LastUpdate = DateTime.UtcNow
+          });
+        }
+      }
+
+      enhancedPositions.Add(new EnhancedVehiclePosition
+      {
+        RouteId = routeId,
+        RouteShortName = routeInfo?.RouteShortName?.Replace("\"", "") ?? routeId,
+        RouteLongName = routeInfo?.RouteLongName?.Replace("\"", "") ?? "",
+        RouteType = routeInfo != null && int.TryParse(routeInfo.RouteType, out var type) ? type : 3,
+        Vehicles = vehicles
+      });
+    }
+
+    return enhancedPositions;
+  }
+
+  public async Task<EnhancedVehiclePosition?> GetCurrentVehiclesPositionsByRouteEnhanced(string routeId)
+  {
+    var positions = await GetPositions();
+
+    if (!positions.ContainsKey(routeId))
+    {
+      return null;
+    }
+
+    var vehiclePositions = (List<string>)positions[routeId];
+    var routeInfo = await GetRouteInfo(routeId);
+
+    var vehicles = new List<VehiclePositionData>();
+    foreach (var positionStr in vehiclePositions)
+    {
+      var coords = positionStr.Split(',');
+      if (coords.Length >= 2 &&
+          double.TryParse(coords[0], out var lat) &&
+          double.TryParse(coords[1], out var lng))
+      {
+        vehicles.Add(new VehiclePositionData
+        {
+          Latitude = lat,
+          Longitude = lng,
+          LastUpdate = DateTime.UtcNow
+        });
+      }
+    }
+
+    return new EnhancedVehiclePosition
+    {
+      RouteId = routeId,
+      RouteShortName = routeInfo?.RouteShortName?.Replace("\"", "") ?? routeId,
+      RouteLongName = routeInfo?.RouteLongName?.Replace("\"", "") ?? "",
+      RouteType = routeInfo != null && int.TryParse(routeInfo.RouteType, out var type) ? type : 3,
+      Vehicles = vehicles
+    };
   }
   #endregion
 
