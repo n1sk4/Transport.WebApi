@@ -1,51 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Route Bus Tracker</title>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zagreb Transport Tracker</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚌</text></svg>">
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+
   <!-- Custom CSS -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="sidebar">
-    <div class="controls">
-      <h3>🚌 Zagreb Transport Tracker</h3>
-      <div class="control-group">
-        <label for="routeSelect">Select Route:</label>
-        <div class="input-group">
-          <select id="routeSelect">
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="header">
+        <h1>🚋 Zagreb Transport</h1>
+        <p class="subtitle">Real-time vehicle tracking</p>
+      </div>
+
+      <!-- Route Selection -->
+      <div class="section">
+        <h3>📍 Select Route</h3>
+        <div class="route-selector">
+          <select id="routeDropdown" class="route-dropdown">
             <option value="">Loading routes...</option>
           </select>
-          <button id="addButton" class="add-button" title="Add Route" disabled>+</button>
+          <button id="trackRouteBtn" class="btn btn-primary" disabled>
+            Track Route
+          </button>
+        </div>
+        <button id="showAllVehiclesBtn" class="btn btn-secondary">
+          Show All Vehicles
+        </button>
+      </div>
+
+      <!-- Tracked Routes List -->
+      <div class="section">
+        <h3>🎯 Tracked Routes</h3>
+        <div id="trackedRoutesList" class="tracked-routes-list">
+          <div class="empty-state">
+            <p>No routes tracked yet</p>
+            <small>Select a route above to start tracking</small>
+          </div>
         </div>
       </div>
 
-      <div class="control-group">
-        <div class="button-group">
-          <button id="showAllVehicles" class="secondary">Show All Vehicles</button>
-          <button id="clearAll" class="secondary">Clear All</button>
-        </div>
-      </div>
-
-      <div class="tracked-routes">
-        <h4>Active Routes</h4>
-        <div id="routesList"></div>
-      </div>
+      <!-- Status -->
+      <div id="statusMessage" class="status-message hidden"></div>
     </div>
 
-    <div id="status" class="status"></div>
-  </div>
+    <!-- Map Container -->
+    <div class="map-container">
+      <div id="map" class="map"></div>
 
-  <div class="map-container">
-    <div id="map"></div>
+      <!-- Map Controls -->
+      <div class="map-controls">
+        <button id="clearAllBtn" class="btn btn-danger btn-small">
+          Clear All
+        </button>
+        <button id="centerMapBtn" class="btn btn-secondary btn-small">
+          Center Map
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
   <!-- Custom JavaScript -->
   <script src="script.js"></script>
 </body>

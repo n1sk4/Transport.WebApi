@@ -50,6 +50,32 @@ public class CachedGtfsService : IGtfsService
       _cacheOptions.RealtimeCacheSeconds
     );
   }
+  public async Task<List<EnhancedVehiclePosition>> GetAllVehiclesCurrentPositionsEnhanced()
+  {
+    return await _cacheService.GetOrSetAsync(
+      $"{CacheKeyGenerator.GetAllVehiclesCurrentPositionsKey()}-enhanced",
+      async () =>
+      {
+        _logger.LogDebug("Fetching all vehicles' enhanced current positions from source");
+        return await _baseService.GetAllVehiclesCurrentPositionsEnhanced();
+      },
+      _cacheOptions.RealtimeCacheSeconds
+    );
+  }
+
+  public async Task<EnhancedVehiclePosition?> GetCurrentVehiclesPositionsByRouteEnhanced(string routeId)
+  {
+    var cacheKey = $"{CacheKeyGenerator.GetCurrentVehiclesPositionsByRouteKey(routeId)}-enhanced";
+    return await _cacheService.GetOrSetAsync(
+      cacheKey,
+      async () =>
+      {
+        _logger.LogDebug("Fetching enhanced current vehicle positions for route {RouteId} from source", routeId);
+        return await _baseService.GetCurrentVehiclesPositionsByRouteEnhanced(routeId);
+      },
+      _cacheOptions.RealtimeCacheSeconds
+    );
+  }
   #endregion
 
   #region Static Data Retrieval
