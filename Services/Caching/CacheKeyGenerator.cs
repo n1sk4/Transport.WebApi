@@ -7,11 +7,11 @@ public static class CacheKeyGenerator
 {
   #region Realtime Data Cache Keys
   public static string GetRealtimeDataKey()
-    => $"gtfs:realtime:{DateTime.UtcNow:yyyy-MM-dd}";
+    => $"gtfs:realtime:feed";
   public static string GetAllVehiclesCurrentPositionsKey()
-    => $"gtfs:realtime:all-vehicles:{DateTime.UtcNow:yyyy-MM-dd}";
+    => $"gtfs:realtime:all-vehicles";
   public static string GetCurrentVehiclesPositionsByRouteKey(string routeId)
-    => $"gtfs:realtime:current-vehicles:route:{routeId}:{DateTime.UtcNow:yyyy-MM-dd}";
+    => $"gtfs:realtime:route{routeId}";
   #endregion
 
   #region Static Data Cache Keys

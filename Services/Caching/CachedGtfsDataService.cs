@@ -35,7 +35,7 @@ public class CachedGtfsDataService : IGtfsDataService
         _logger.LogDebug("Fetching realtime data from source");
         return await _baseService.GetRealtimeDataAsync();
       },
-      _cacheOptions.RealtimeCacheSeconds
+      _cacheOptions.RealtimeCacheDuration
     );
   }
   #endregion
@@ -52,7 +52,7 @@ public class CachedGtfsDataService : IGtfsDataService
         _logger.LogInformation("Fetching static data for file: {FileName} from source", fileName);
         return await _baseService.GetStaticFileDataAsync(fileName);
       },
-      _cacheOptions.StaticCacheHours
+      _cacheOptions.StaticCacheDuration
     );
   }
   #endregion

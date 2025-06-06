@@ -1,15 +1,24 @@
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using Transport.WebApi.Services.Caching;
+using Transport.WebApi.Options;
+using Microsoft.Extensions.Logging;
+using System.Collections;
 
 public class MemoryCacheService : ICacheService
 {
   private readonly IMemoryCache _memoryCache;
   private readonly ILogger<MemoryCacheService> _logger;
+  private readonly CacheOptions _cacheOptions;
 
-  public MemoryCacheService(IMemoryCache memoryCache, ILogger<MemoryCacheService> logger)
+  public MemoryCacheService(
+    IMemoryCache memoryCache,
+    ILogger<MemoryCacheService> logger,
+    IOptions<CacheOptions> cacheOptions)
   {
     _memoryCache = memoryCache;
     _logger = logger;
+    _cacheOptions = cacheOptions.Value;
   }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -19,11 +28,17 @@ public class MemoryCacheService : ICacheService
     {
       if (_memoryCache.TryGetValue(key, out var cached))
       {
-        _logger.LogDebug("Cache hit for key: {CacheKey}", key);
+        if (_cacheOptions.LogCacheOperations)
+        {
+          _logger.LogDebug("Cache HIT for key: {CacheKey}, Type: {Type}", key, typeof(T).Name);
+        }
         return (T?)cached;
       }
 
-      _logger.LogDebug("Cache miss for key: {CacheKey}", key);
+      if (_cacheOptions.LogCacheOperations)
+      {
+        _logger.LogDebug("Cache MISS for key: {CacheKey}, Type: {Type}", key, typeof(T).Name);
+      }
       return null;
     }
     catch (Exception ex)
@@ -39,11 +54,12 @@ public class MemoryCacheService : ICacheService
     {
       int size = value switch
       {
-        ICollection<T> collection => Math.Max(1, collection.Count / 10),
+        ICollection<object> collection => Math.Max(1, collection.Count / 10),
         string str => Math.Max(1, str.Length / 1000),
         byte[] bytes => Math.Max(1, bytes.Length / 10000),
         _ => 1
       };
+
       var cacheOptions = new MemoryCacheEntryOptions
       {
         AbsoluteExpirationRelativeToNow = expiration,
@@ -52,8 +68,26 @@ public class MemoryCacheService : ICacheService
         Size = size
       };
 
+      if (_cacheOptions.LogCacheOperations)
+      {
+        cacheOptions.RegisterPostEvictionCallback((evictedKey, evictedValue, reason, state) =>
+        {
+          _logger.LogDebug("Cache item evicted - Key: {Key}, Reason: {Reason}, Type: {Type}",
+            evictedKey, reason, typeof(T).Name);
+        });
+      }
+
       _memoryCache.Set(key, value, cacheOptions);
-      _logger.LogDebug("Cached item with key: {CacheKey}, expires in: {Expiration}", key, expiration);
+
+      if (_cacheOptions.LogCacheOperations)
+      {
+        _logger.LogDebug("Cache SET - Key: {CacheKey}, Expires in: {Expiration}, Size: {Size}, Type: {Type}",
+          key, expiration, size, typeof(T).Name);
+      }
+      else
+      {
+        _logger.LogInformation("Cached item with key: {CacheKey}, expires in: {Expiration}", key, expiration);
+      }
     }
     catch (Exception ex)
     {
@@ -66,7 +100,10 @@ public class MemoryCacheService : ICacheService
     try
     {
       _memoryCache.Remove(key);
-      _logger.LogDebug("Removed cache entry for key: {CacheKey}", key);
+      if (_cacheOptions.LogCacheOperations)
+      {
+        _logger.LogDebug("Cache REMOVE - Key: {CacheKey}", key);
+      }
     }
     catch (Exception ex)
     {

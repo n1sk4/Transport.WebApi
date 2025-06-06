@@ -60,8 +60,8 @@ public class StatisticsController : ControllerBase
     {
       CacheConfiguration = new CacheConfiguration
       {
-        RealtimeCacheSeconds = _cacheOptions.RealtimeCacheSeconds,
-        StaticCacheHours = _cacheOptions.StaticCacheHours,
+        RealtimeCacheSeconds = _cacheOptions.RealtimeCacheDuration,
+        StaticCacheHours = _cacheOptions.StaticCacheDuration,
         CacheSizeLimit = _cacheOptions.CacheSizeLimit,
         CompactionPercentage = _cacheOptions.CompactionPercentage,
         EnableCacheHealthCheck = _cacheOptions.EnableCacheHealthCheck,

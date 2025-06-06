@@ -409,15 +409,6 @@ async function updateRouteVehicles(routeId) {
     const renderEnd = performance.now();
     console.log(`Rendered ${markersToAdd.length} markers for route ${routeId} in ${(renderEnd - renderStart).toFixed(2)}ms`);
 
-    // Auto-fit bounds for first route (only if it's the only tracked route)
-    if (trackedRoutes.size === 1 && routeData.markers.length > 0) {
-      const boundsStart = performance.now();
-      const group = new L.featureGroup(routeData.markers);
-      map.fitBounds(group.getBounds().pad(0.1));
-      const boundsEnd = performance.now();
-      console.log(`Map bounds fitted in ${(boundsEnd - boundsStart).toFixed(2)}ms`);
-    }
-
   } catch (error) {
     console.error(`Error updating vehicles for route ${routeId}:`, error);
     // Check if it's a network timeout

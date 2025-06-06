@@ -34,7 +34,7 @@ public class CachedGtfsService : IGtfsService
         _logger.LogDebug("Fetching all vehicles' current positions from source");
         return await _baseService.GetAllVechiclesCurrentPositions();
       },
-      _cacheOptions.RealtimeCacheSeconds
+      _cacheOptions.RealtimeCacheDuration
     );
   }
   public async Task<VehicleCurrentPosition> GetCurrentVehiclesPositionsByRoute(string routeId)
@@ -47,7 +47,7 @@ public class CachedGtfsService : IGtfsService
         _logger.LogDebug("Fetching current vehicle positions for route {RouteId} from source", routeId);
         return await _baseService.GetCurrentVehiclesPositionsByRoute(routeId);
       },
-      _cacheOptions.RealtimeCacheSeconds
+      _cacheOptions.RealtimeCacheDuration
     );
   }
   public async Task<List<EnhancedVehiclePosition>> GetAllVehiclesCurrentPositionsEnhanced()
@@ -59,7 +59,7 @@ public class CachedGtfsService : IGtfsService
         _logger.LogDebug("Fetching all vehicles' enhanced current positions from source");
         return await _baseService.GetAllVehiclesCurrentPositionsEnhanced();
       },
-      _cacheOptions.RealtimeCacheSeconds
+      _cacheOptions.RealtimeCacheDuration
     );
   }
 
@@ -73,7 +73,7 @@ public class CachedGtfsService : IGtfsService
         _logger.LogDebug("Fetching enhanced current vehicle positions for route {RouteId} from source", routeId);
         return await _baseService.GetCurrentVehiclesPositionsByRouteEnhanced(routeId);
       },
-      _cacheOptions.RealtimeCacheSeconds
+      _cacheOptions.RealtimeCacheDuration
     );
   }
   #endregion
@@ -95,7 +95,7 @@ public class CachedGtfsService : IGtfsService
         _logger.LogDebug("Fetching all routes from source");
         return await _baseService.GetAllRoutes();
       },
-      _cacheOptions.StaticCacheHours
+      _cacheOptions.StaticCacheDuration
     );
   }
 
@@ -110,7 +110,7 @@ public class CachedGtfsService : IGtfsService
         _logger.LogDebug("Fetching route shape for {RouteId} from source", routeId);
         return await _baseService.GetRouteShape(routeId);
       },
-      _cacheOptions.StaticCacheHours
+      _cacheOptions.StaticCacheDuration
     );
   }
   #endregion
