@@ -82,18 +82,26 @@ internal class Program
       return new CachedGtfsService(baseService, cacheService, cacheOptions, logger);
     });
 
-    // CORS Configuration - ADD THIS HERE (before builder.Build())
+    // CORS Configuration
     builder.Services.AddCors(options =>
     {
-      options.AddPolicy("AllowLocalDevelopment", policy =>
+      var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+
+      options.AddPolicy("ApiCorsPolicy", policy =>
       {
-        policy.WithOrigins(
-            "http://localhost:8000",
-            "http://localhost:3000",
-            "http://127.0.0.1:8000"
-        )
-        .AllowAnyMethod()
-        .AllowAnyHeader();
+        if (allowedOrigins.Length > 0)
+        {
+          policy.WithOrigins(allowedOrigins)
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        }
+        else
+        {
+          // Fallback for development if not configured
+          policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        }
       });
     });
 
