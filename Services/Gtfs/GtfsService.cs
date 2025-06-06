@@ -2,7 +2,7 @@ using TransitRealtime;
 using Transport.WebApi.Models;
 using Transport.WebApi.Options;
 
-namespace Transport.WebApi.Services;
+namespace Transport.WebApi.Services.Gtfs;
 
 public class GtfsService
 {
@@ -28,7 +28,7 @@ public class GtfsService
 
     var routePositions = positions
         .Where(kvp => kvp.Key == routeId)
-        .SelectMany<KeyValuePair<string, object>, string>(kvp => (IEnumerable<string>)kvp.Value)
+        .SelectMany(kvp => (IEnumerable<string>)kvp.Value)
         .ToList();
 
     return new VehicleCurrentPosition { { routeId, routePositions } };

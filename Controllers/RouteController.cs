@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using Transport.WebApi.Models;
-using Transport.WebApi.Services;
+using Transport.WebApi.Services.Gtfs;
 
 namespace Transport.WebApi.Controllers;
 

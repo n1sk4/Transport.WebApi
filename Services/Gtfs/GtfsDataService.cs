@@ -2,7 +2,7 @@ using Microsoft.Extensions.Options;
 using System.IO.Compression;
 using Transport.WebApi.Options;
 
-namespace Transport.WebApi.Services;
+namespace Transport.WebApi.Services.Gtfs;
 
 public class GtfsDataService
 {

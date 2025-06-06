@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.ComponentModel.DataAnnotations;
 using Transport.WebApi.Options;
-using Transport.WebApi.Services;
 using Transport.WebApi.Services.Caching;
+using Transport.WebApi.Services.Gtfs;
 
 namespace Transport.WebApi.Controllers;
 

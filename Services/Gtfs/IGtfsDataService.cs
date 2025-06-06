@@ -1,6 +1,6 @@
 using Transport.WebApi.Options;
 
-namespace Transport.WebApi.Services;
+namespace Transport.WebApi.Services.Gtfs;
 
 public interface IGtfsDataService
 {

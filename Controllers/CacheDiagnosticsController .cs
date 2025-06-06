@@ -63,7 +63,7 @@ public class CacheDiagnosticsController : ControllerBase
   /// Check if a specific cache key exists
   /// </summary>
   [HttpGet("check-key/{key}")]
-  public async Task<IActionResult> CheckCacheKey(string key)
+  public IActionResult CheckCacheKey(string key)
   {
     if (!HttpContext.RequestServices.GetService<IWebHostEnvironment>()?.IsDevelopment() ?? false)
     {
