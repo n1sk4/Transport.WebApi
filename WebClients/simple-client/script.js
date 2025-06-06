@@ -16,8 +16,8 @@ let allVehiclesMode = false;
 
 // Storage keys
 const STORAGE_KEYS = {
-  routes: 'zet_routes_cache',
-  cacheTimestamp: 'zet_routes_cache_timestamp'
+  routes: 'zet_routes_cache_v2', // Changed version to force cache refresh
+  cacheTimestamp: 'zet_routes_cache_timestamp_v2'
 };
 
 // Cache duration (24 hours)
@@ -88,12 +88,20 @@ async function loadRoutes() {
 
     // Fetch from API
     const routesData = await api.fetchAllRoutes();
-    allRoutes = routesData.map(route => ({
-      routeId: route.routeId,
-      shortName: cleanRouteString(route.routeShortName),
-      longName: cleanRouteString(route.routeLongName),
-      routeType: parseInt(route.routeType) || 3
-    }));
+    console.log('Raw routes data sample:', routesData.slice(0, 3)); // Debug log
+
+    allRoutes = routesData.map(route => {
+      // Make sure we parse the routeType correctly - it comes as string
+      const routeType = parseInt(route.routeType, 10);
+      const parsedRoute = {
+        routeId: route.routeId,
+        shortName: cleanRouteString(route.routeShortName),
+        longName: cleanRouteString(route.routeLongName),
+        routeType: isNaN(routeType) ? 3 : routeType // Default to bus if parsing fails
+      };
+      console.log(`Route ${route.routeId}: original="${route.routeType}", parsed=${parsedRoute.routeType}`); // Debug log
+      return parsedRoute;
+    });
 
     // Cache the routes
     cacheRoutes(allRoutes);
@@ -178,6 +186,14 @@ function populateRouteDropdown() {
 
   dropdown.innerHTML = '<option value="">Select a route...</option>';
 
+  console.log('Populating dropdown. Total routes:', allRoutes.length);
+  console.log('First 5 routes with types:', allRoutes.slice(0, 5).map(r => ({
+    id: r.routeId,
+    name: r.shortName,
+    type: r.routeType,
+    emoji: getVehicleEmoji(r.routeType)
+  })));
+
   // Sort routes by route type and then by short name
   const sortedRoutes = [...allRoutes].sort((a, b) => {
     if (a.routeType !== b.routeType) {
@@ -185,6 +201,13 @@ function populateRouteDropdown() {
     }
     return a.shortName.localeCompare(b.shortName, undefined, { numeric: true });
   });
+
+  // Count routes by type for debugging
+  const typeCounts = {};
+  sortedRoutes.forEach(route => {
+    typeCounts[route.routeType] = (typeCounts[route.routeType] || 0) + 1;
+  });
+  console.log('Route type distribution:', typeCounts);
 
   sortedRoutes.forEach(route => {
     const option = document.createElement('option');
@@ -194,7 +217,7 @@ function populateRouteDropdown() {
     const displayName = `${emoji} ${route.shortName}${route.longName ? ` - ${route.longName}` : ''}`;
 
     option.textContent = displayName;
-    option.title = `Route ${route.shortName} (${getVehicleTypeName(route.routeType)})`;
+    option.title = `Route ${route.shortName} (${getVehicleTypeName(route.routeType)}) - Type: ${route.routeType}`;
 
     dropdown.appendChild(option);
   });
