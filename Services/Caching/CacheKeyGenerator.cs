@@ -16,10 +16,10 @@ public static class CacheKeyGenerator
 
   #region Static Data Cache Keys
   public static string GetStaticDataKey(GtfsStaticDataFile fileName)
-    => $"gtfs:static:{fileName}:{DateTime.UtcNow:yyyy-MM-dd}";
+    => $"gtfs:static:{fileName}";
   public static string GetAllRoutesKey()
-    => $"gtfs:static:routes:{DateTime.UtcNow:yyyy-MM-dd}";
+    => $"gtfs:static:routes";
   public static string GetRouteShapeKey(string routeId)
-    => $"gtfs:shape:route:{routeId}:{DateTime.UtcNow:yyyy-MM-dd}";
+    => $"gtfs:shape:route:{routeId}";
   #endregion
 }
