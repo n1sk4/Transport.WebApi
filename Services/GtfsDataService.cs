@@ -9,6 +9,7 @@ public class GtfsDataService
   private readonly HttpClient _httpClient;
   private readonly ILogger<GtfsDataService> _logger;
   private readonly GtfsOptions _gtfsOptions;
+  private readonly Dictionary<GtfsStaticDataFile, List<string>> _staticDataCache = new();
 
   public GtfsDataService(HttpClient httpClient, ILogger<GtfsDataService> logger, IOptions<GtfsOptions> gtfsOptions)
   {
@@ -18,8 +19,35 @@ public class GtfsDataService
     _logger = logger;
   }
 
+  #region Realtime Data Retrieval
+  public async Task<byte[]> GetRealtimeDataAsync()
+  {
+    try
+    {
+      _logger.LogDebug("Fetching realtime GTFS data.");
+      var response = await _httpClient.GetAsync(_gtfsOptions.RealtimeDataEndpoint);
+      response.EnsureSuccessStatusCode();
+      var content = await response.Content.ReadAsByteArrayAsync();
+      _logger.LogDebug("Successfully fetched realtime GTFS data.");
+      return content;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Error fetching realtime GTFS data.");
+      throw;
+    }
+  }
+  #endregion
+
+  #region Static Data Retrieval
+
   public async Task<List<string>> GetStaticFileDataAsync(GtfsStaticDataFile fileName)
   {
+    if (_staticDataCache.TryGetValue(fileName, out var cachedData))
+    {
+      return cachedData;
+    }
+
     try
     {
       var zipData = await _httpClient.GetByteArrayAsync(_gtfsOptions.StaticDataEndpoint);
@@ -49,6 +77,7 @@ public class GtfsDataService
         lines.Add(line);
       }
 
+      _staticDataCache[fileName] = lines;
       return lines;
     }
     catch (Exception ex)
@@ -57,23 +86,5 @@ public class GtfsDataService
       return new List<string>();
     }
   }
-
-
-  public async Task<byte[]> GetRealtimeDataAsync()
-  {
-    try
-    {
-      _logger.LogDebug("Fetching realtime GTFS data.");
-      var response = await _httpClient.GetAsync(_gtfsOptions.RealtimeDataEndpoint);
-      response.EnsureSuccessStatusCode();
-      var content = await response.Content.ReadAsByteArrayAsync();
-      _logger.LogDebug("Successfully fetched realtime GTFS data.");
-      return content;
-    }
-    catch (Exception ex)
-    {
-      _logger.LogError(ex, "Error fetching realtime GTFS data.");
-      throw;
-    }
-  }
+  #endregion
 }

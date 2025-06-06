@@ -1,17 +1,17 @@
-using TransitRealtime;
+using Transport.WebApi.Models;
 using Transport.WebApi.Options;
 
 namespace Transport.WebApi.Services;
 
 public interface IGtfsService
 {
-  Task<FeedMessage> GetAllRealtimeData();
-  Task<FeedEntity> GetAllDataRealtime();
-  Task<FeedEntity[]> GetAllVehicles();
-  Task<FeedEntity?> GetAVehicleById(string vehicleId);
-  Task<FeedEntity[]> GetAllVehiclesByRoute(string routeId);
-  Task<List<Position>> GetAllVehiclePositionsByRouteId(string routeId);
-  Task<Dictionary<string, List<Position>>> GetAllVehiclePositions();
+  #region Realtime Data Retrieval
+  Task<VehicleCurrentPosition> GetAllVechiclesCurrentPositions();
+  Task<VehicleCurrentPosition> GetCurrentVehiclesPositionsByRoute(string routeId);
+  #endregion
+  #region Static Data Retrieval
   Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName);
-  Task<List<string>> GetRouteShape(string routeId);
+  Task<List<JsonSerializedRoutes>> GetAllRoutes();
+  Task<List<JsonSerializedRouteShapes>> GetRouteShape(string routeId);
+  #endregion
 }
