@@ -37,7 +37,13 @@ public class MemoryCacheService : ICacheService
   {
     try
     {
-      int size = (value is ICollection<T> collection) ? collection.Count : 1;
+      int size = value switch
+      {
+        ICollection<T> collection => Math.Max(1, collection.Count / 10),
+        string str => Math.Max(1, str.Length / 1000),
+        byte[] bytes => Math.Max(1, bytes.Length / 10000),
+        _ => 1
+      };
       var cacheOptions = new MemoryCacheEntryOptions
       {
         AbsoluteExpirationRelativeToNow = expiration,

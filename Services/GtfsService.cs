@@ -165,8 +165,8 @@ public class GtfsService
           return new JsonSerializedRoutes()
           {
             RouteId = parts.Length > 0 ? parts[0] : string.Empty,
-            RouteShortName = parts.Length > 2 ? parts[2].Replace("\"", string.Empty) : string.Empty,
-            RouteLongName = parts.Length > 3 ? parts[3].Replace("\"", string.Empty) : string.Empty,
+            RouteShortName = parts.Length > 2 ? parts[2].Trim('\"') : string.Empty,
+            RouteLongName = parts.Length > 3 ? parts[3].Trim('\"') : string.Empty,
             RouteType = parts.Length > 5 ? parts[5] : string.Empty
           };
         })

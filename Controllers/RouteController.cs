@@ -62,6 +62,16 @@ public class RouteController : ControllerBase
       return BadRequest("Route ID cannot be empty");
     }
 
+    if (routeId.Length > 3)
+    {
+      return BadRequest("Route ID is too long");
+    }
+
+    if (!System.Text.RegularExpressions.Regex.IsMatch(routeId, @"^[a-zA-Z0-9_-]+$"))
+    {
+      return BadRequest("Route ID contains invalid characters");
+    }
+
     try
     {
       _logger.LogDebug("GetRouteShapeData called for routeId: {RouteId}", routeId);
