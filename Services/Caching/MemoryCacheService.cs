@@ -1,9 +1,8 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
-using Transport.WebApi.Services.Caching;
 using Transport.WebApi.Options;
-using Microsoft.Extensions.Logging;
-using System.Collections;
+
+namespace Transport.WebApi.Services.Caching;
 
 public class MemoryCacheService : ICacheService
 {
@@ -123,6 +122,28 @@ public class MemoryCacheService : ICacheService
     await SetAsync(key, value, expiration);
     return value;
   }
-}
+
+  // New method to handle nullable types
+  public async Task<T?> GetOrSetNullableAsync<T>(string key, Func<Task<T?>> factory, TimeSpan expiration) where T : class
+  {
+    // Use a wrapper to store nullable values in cache
+    var wrapper = await GetAsync<NullableWrapper<T>>(key);
+    if (wrapper != null)
+    {
+      return wrapper.Value;
+    }
+
+    var value = await factory();
+    var wrapperToCache = new NullableWrapper<T> { Value = value };
+    await SetAsync(key, wrapperToCache, expiration);
+    return value;
+  }
 
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+}
+
+// Helper class for nullable caching
+internal class NullableWrapper<T> where T : class
+{
+  public T? Value { get; set; }
+}

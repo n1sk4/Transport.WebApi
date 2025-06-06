@@ -1,5 +1,3 @@
-using Transport.WebApi.Options;
-
 namespace Transport.WebApi.Services.Caching;
 
 public interface ICacheService
@@ -8,4 +6,5 @@ public interface ICacheService
   Task SetAsync<T>(string key, T value, TimeSpan expiration) where T : class;
   Task RemoveAsync(string key);
   Task<T> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan expiration) where T : class;
+  Task<T?> GetOrSetNullableAsync<T>(string key, Func<Task<T?>> factory, TimeSpan expiration) where T : class;
 }

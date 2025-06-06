@@ -1,4 +1,3 @@
-using TransitRealtime;
 using Transport.WebApi.Models;
 using Transport.WebApi.Options;
 using Transport.WebApi.Services.Caching;
@@ -67,15 +66,18 @@ public class CachedGtfsService : IGtfsService
   public async Task<EnhancedVehiclePosition?> GetCurrentVehiclesPositionsByRouteEnhanced(string routeId)
   {
     var cacheKey = $"{CacheKeyGenerator.GetCurrentVehiclesPositionsByRouteKey(routeId)}-enhanced";
-    return await _cacheService.GetOrSetAsync(
+    var wrapper = await _cacheService.GetOrSetAsync(
       cacheKey,
       async () =>
       {
         _logger.LogDebug("Fetching enhanced current vehicle positions for route {RouteId} from source", routeId);
-        return await _baseService.GetCurrentVehiclesPositionsByRouteEnhanced(routeId);
+        var result = await _baseService.GetCurrentVehiclesPositionsByRouteEnhanced(routeId);
+        return new EnhancedVehiclePositionWrapper { Value = result };
       },
       _cacheOptions.RealtimeCacheDuration
     );
+
+    return wrapper?.Value;
   }
   #endregion
 
@@ -115,4 +117,9 @@ public class CachedGtfsService : IGtfsService
     );
   }
   #endregion
+}
+
+internal class EnhancedVehiclePositionWrapper
+{
+  public EnhancedVehiclePosition? Value { get; set; }
 }
