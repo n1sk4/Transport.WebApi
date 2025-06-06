@@ -18,7 +18,7 @@ public class VehiclePositionController : ControllerBase
   }
 
   /// <summary>
-  /// Gets the current positions of all vehicles
+  /// Gets the current positions of all vehicles (legacy format)
   /// </summary>
   [HttpGet("CurrentPositions")]
   [ProducesResponseType(200, Type = typeof(List<VehicleCurrentPosition>))]
@@ -46,7 +46,35 @@ public class VehiclePositionController : ControllerBase
   }
 
   /// <summary>
-  /// Gets the current position of a vehicle by its route
+  /// Gets the current positions of all vehicles with route type information
+  /// </summary>
+  [HttpGet("CurrentPositionsEnhanced")]
+  [ProducesResponseType(200, Type = typeof(List<EnhancedVehiclePosition>))]
+  [ProducesResponseType(404)]
+  [ProducesResponseType(500)]
+  public async Task<ActionResult<List<EnhancedVehiclePosition>>> GetCurrentVehiclePositionsEnhanced()
+  {
+    try
+    {
+      _logger.LogDebug("GetCurrentVehiclePositionsEnhanced called");
+      var vehiclePositions = await _gtfsService.GetAllVehiclesCurrentPositionsEnhanced();
+      if (vehiclePositions != null && vehiclePositions.Count > 0)
+      {
+        _logger.LogInformation("Retrieved enhanced data for {Count} routes", vehiclePositions.Count);
+        return Ok(vehiclePositions);
+      }
+      _logger.LogWarning("No current vehicle positions found");
+      return NotFound("No current vehicle positions found");
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Error retrieving enhanced vehicle positions");
+      return StatusCode(500, "Internal server error while retrieving vehicle positions");
+    }
+  }
+
+  /// <summary>
+  /// Gets the current position of a vehicle by its route (legacy format)
   /// </summary>
   [HttpGet("CurrentPositionByRoute")]
   [ProducesResponseType(200, Type = typeof(List<VehicleCurrentPosition>))]
@@ -69,6 +97,34 @@ public class VehiclePositionController : ControllerBase
     catch (Exception ex)
     {
       _logger.LogError(ex, "Error retrieving current vehicle position for route: {RouteId}", routeId);
+      return StatusCode(500, "Internal server error while retrieving vehicle position");
+    }
+  }
+
+  /// <summary>
+  /// Gets the current position of vehicles by route with route type information
+  /// </summary>
+  [HttpGet("CurrentPositionByRouteEnhanced")]
+  [ProducesResponseType(200, Type = typeof(EnhancedVehiclePosition))]
+  [ProducesResponseType(404)]
+  [ProducesResponseType(500)]
+  public async Task<ActionResult<EnhancedVehiclePosition>> GetCurrentVehiclePositionByRouteEnhanced([FromQuery] string routeId)
+  {
+    try
+    {
+      _logger.LogDebug("GetCurrentVehiclePositionEnhanced called for route: {RouteId}", routeId);
+      var vehiclePosition = await _gtfsService.GetCurrentVehiclesPositionsByRouteEnhanced(routeId);
+      if (vehiclePosition != null)
+      {
+        _logger.LogInformation("Retrieved enhanced position data for route: {RouteId}", routeId);
+        return Ok(vehiclePosition);
+      }
+      _logger.LogWarning("No current position found for route: {RouteId}", routeId);
+      return NotFound($"No current position found for route {routeId}");
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Error retrieving enhanced vehicle position for route: {RouteId}", routeId);
       return StatusCode(500, "Internal server error while retrieving vehicle position");
     }
   }
