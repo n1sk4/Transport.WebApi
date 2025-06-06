@@ -46,29 +46,48 @@ function initializeMap() {
 // API helper functions
 const api = {
   async fetchAllRoutes() {
+    const startTime = performance.now();
     const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.allRoutes}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch routes: ${response.status} ${response.statusText}`);
     }
-    return response.json();
+    const data = await response.json();
+    const endTime = performance.now();
+    console.log(`Routes API call took ${(endTime - startTime).toFixed(2)}ms`);
+    return data;
   },
 
   async fetchAllVehicles() {
+    const startTime = performance.now();
     const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.currentPositionsEnhanced}`);
     if (!response.ok) {
-      if (response.status === 404) return [];
+      if (response.status === 404) {
+        console.log('No vehicles available (404)');
+        return [];
+      }
       throw new Error(`Failed to fetch all vehicles: ${response.status} ${response.statusText}`);
     }
-    return response.json();
+    const data = await response.json();
+    const endTime = performance.now();
+    console.log(`All vehicles API call took ${(endTime - startTime).toFixed(2)}ms, returned ${data.length} routes`);
+    return data;
   },
 
   async fetchVehiclesByRoute(routeId) {
+    const startTime = performance.now();
     const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.currentPositionByRouteEnhanced}?routeId=${routeId}`);
     if (!response.ok) {
-      if (response.status === 404) return null;
+      if (response.status === 404) {
+        console.log(`No vehicles available for route ${routeId} (404)`);
+        return null;
+      }
       throw new Error(`Failed to fetch vehicles for route ${routeId}: ${response.status} ${response.statusText}`);
     }
-    return response.json();
+    const data = await response.json();
+    const endTime = performance.now();
+    const vehicleCount = data?.vehicles?.length || 0;
+    console.log(`Route ${routeId} API call took ${(endTime - startTime).toFixed(2)}ms, returned ${vehicleCount} vehicles`);
+    return data;
   }
 };
 
@@ -293,11 +312,17 @@ async function trackRoute(routeId) {
     return;
   }
 
+  const startTime = performance.now();
+  console.log(`Starting to track route ${routeId}...`);
+
   const route = allRoutes.find(r => r.routeId === routeId);
   if (!route) {
     showStatus('Route not found', 'error');
     return;
   }
+
+  // Show immediate feedback
+  showStatus(`Loading vehicles for route ${route.shortName}...`, 'loading');
 
   // Exit all vehicles mode if active
   if (allVehiclesMode) {
@@ -313,17 +338,28 @@ async function trackRoute(routeId) {
   };
 
   trackedRoutes.set(parseInt(routeId), routeData);
+  updateTrackedRoutesList(); // Show route in list immediately, even with 0 vehicles
 
-  // Start tracking immediately
-  await updateRouteVehicles(parseInt(routeId));
+  try {
+    // Start tracking immediately
+    await updateRouteVehicles(parseInt(routeId));
 
-  // Set up interval for updates
-  routeData.interval = setInterval(() => updateRouteVehicles(parseInt(routeId)), 10000);
+    // Set up interval for updates
+    routeData.interval = setInterval(() => updateRouteVehicles(parseInt(routeId)), 10000);
 
-  updateTrackedRoutesList();
+    const endTime = performance.now();
+    console.log(`Route ${routeId} loaded in ${(endTime - startTime).toFixed(2)}ms`);
 
-  const emoji = getVehicleEmoji(route.routeType);
-  showStatus(`${emoji} Route ${route.shortName} is now being tracked`, 'success');
+    const emoji = getVehicleEmoji(route.routeType);
+    showStatus(`${emoji} Route ${route.shortName} is now being tracked`, 'success');
+
+  } catch (error) {
+    console.error(`Error tracking route ${routeId}:`, error);
+    showStatus(`Failed to load route ${route.shortName}`, 'error');
+    // Remove from tracked routes if failed
+    trackedRoutes.delete(parseInt(routeId));
+    updateTrackedRoutesList();
+  }
 
   // Clear dropdown selection
   document.getElementById('routeDropdown').value = '';
@@ -333,8 +369,15 @@ async function updateRouteVehicles(routeId) {
   const routeData = trackedRoutes.get(routeId);
   if (!routeData || !routeData.visible) return;
 
+  const fetchStart = performance.now();
+  console.log(`Fetching vehicles for route ${routeId}...`);
+
   try {
     const vehicleData = await api.fetchVehiclesByRoute(routeId);
+    const fetchEnd = performance.now();
+    console.log(`API call for route ${routeId} took ${(fetchEnd - fetchStart).toFixed(2)}ms`);
+
+    const renderStart = performance.now();
 
     // Clear existing markers
     routeData.markers.forEach(marker => map.removeLayer(marker));
@@ -343,27 +386,45 @@ async function updateRouteVehicles(routeId) {
     if (!vehicleData || !vehicleData.vehicles || vehicleData.vehicles.length === 0) {
       routeData.vehicleCount = 0;
       updateTrackedRoutesList();
+      console.log(`No vehicles found for route ${routeId}`);
       return;
     }
 
-    // Add new markers
+    // Batch add markers for better performance
+    const markersToAdd = [];
     vehicleData.vehicles.forEach(vehicle => {
-      const marker = createVehicleMarker(vehicle, vehicleData);
-      marker.addTo(map);
-      routeData.markers.push(marker);
+      if (vehicle.latitude && vehicle.longitude) {
+        const marker = createVehicleMarker(vehicle, vehicleData, false);
+        markersToAdd.push(marker);
+        routeData.markers.push(marker);
+      }
     });
 
-    routeData.vehicleCount = vehicleData.vehicles.length;
+    // Add all markers at once
+    markersToAdd.forEach(marker => marker.addTo(map));
+
+    routeData.vehicleCount = markersToAdd.length;
     updateTrackedRoutesList();
 
-    // Auto-fit bounds for first route
+    const renderEnd = performance.now();
+    console.log(`Rendered ${markersToAdd.length} markers for route ${routeId} in ${(renderEnd - renderStart).toFixed(2)}ms`);
+
+    // Auto-fit bounds for first route (only if it's the only tracked route)
     if (trackedRoutes.size === 1 && routeData.markers.length > 0) {
+      const boundsStart = performance.now();
       const group = new L.featureGroup(routeData.markers);
       map.fitBounds(group.getBounds().pad(0.1));
+      const boundsEnd = performance.now();
+      console.log(`Map bounds fitted in ${(boundsEnd - boundsStart).toFixed(2)}ms`);
     }
 
   } catch (error) {
     console.error(`Error updating vehicles for route ${routeId}:`, error);
+    // Check if it's a network timeout
+    if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+      console.log('Possible network timeout or CORS issue');
+      showStatus('Network timeout - trying again...', 'warning');
+    }
     routeData.vehicleCount = 0;
     updateTrackedRoutesList();
   }
@@ -450,24 +511,39 @@ async function showAllVehicles() {
     trackedRoutes.clear();
     let totalVehicles = 0;
 
-    allVehiclesData.forEach(routeData => {
-      if (routeData.vehicles && routeData.vehicles.length > 0) {
+    allVehiclesData.forEach(vehicleRouteData => {
+      if (vehicleRouteData.vehicles && vehicleRouteData.vehicles.length > 0) {
         const markers = [];
 
-        routeData.vehicles.forEach(vehicle => {
-          const marker = createVehicleMarker(vehicle, routeData, true);
+        vehicleRouteData.vehicles.forEach(vehicle => {
+          const marker = createVehicleMarker(vehicle, vehicleRouteData, true);
           marker.addTo(map);
           markers.push(marker);
           totalVehicles++;
         });
 
-        trackedRoutes.set(parseInt(routeData.routeId), {
-          ...routeData,
+        // Find the corresponding route info from our cached routes
+        const routeInfo = allRoutes.find(r => r.routeId === vehicleRouteData.routeId);
+
+        // Create the route data object for the tracked routes list
+        const routeData = {
+          routeId: vehicleRouteData.routeId,
+          shortName: vehicleRouteData.routeShortName || (routeInfo ? routeInfo.shortName : vehicleRouteData.routeId),
+          longName: vehicleRouteData.routeLongName || (routeInfo ? routeInfo.longName : ''),
+          routeType: vehicleRouteData.routeType !== undefined ? vehicleRouteData.routeType : (routeInfo ? routeInfo.routeType : 3),
           markers,
           visible: true,
           interval: null,
-          vehicleCount: routeData.vehicles.length
+          vehicleCount: vehicleRouteData.vehicles.length
+        };
+
+        console.log(`Adding route ${vehicleRouteData.routeId} to tracked list:`, {
+          shortName: routeData.shortName,
+          routeType: routeData.routeType,
+          vehicleCount: routeData.vehicleCount
         });
+
+        trackedRoutes.set(parseInt(vehicleRouteData.routeId), routeData);
       }
     });
 
@@ -482,6 +558,7 @@ async function showAllVehicles() {
       map.fitBounds(group.getBounds().pad(0.05));
     }
 
+    console.log(`Show all vehicles complete. Tracked routes: ${trackedRoutes.size}, Total vehicles: ${totalVehicles}`);
     showStatus(`Showing ${totalVehicles} vehicles across ${trackedRoutes.size} routes`, 'success');
 
   } catch (error) {
@@ -515,6 +592,8 @@ function updateShowAllVehiclesButton() {
 function updateTrackedRoutesList() {
   const listContainer = document.getElementById('trackedRoutesList');
 
+  console.log(`Updating tracked routes list. Count: ${trackedRoutes.size}, All vehicles mode: ${allVehiclesMode}`);
+
   if (trackedRoutes.size === 0) {
     listContainer.innerHTML = `
             <div class="empty-state">
@@ -526,8 +605,23 @@ function updateTrackedRoutesList() {
   }
 
   const routeEntries = Array.from(trackedRoutes.entries()).sort((a, b) => {
-    return a[1].shortName.localeCompare(b[1].shortName, undefined, { numeric: true });
+    // Sort by route type first (trams before buses), then by name
+    const [, routeDataA] = a;
+    const [, routeDataB] = b;
+
+    if (routeDataA.routeType !== routeDataB.routeType) {
+      return routeDataA.routeType - routeDataB.routeType;
+    }
+
+    return routeDataA.shortName.localeCompare(routeDataB.shortName, undefined, { numeric: true });
   });
+
+  console.log('Route entries for list:', routeEntries.map(([id, data]) => ({
+    id,
+    shortName: data.shortName,
+    routeType: data.routeType,
+    vehicleCount: data.vehicleCount
+  })));
 
   listContainer.innerHTML = routeEntries.map(([routeId, routeData]) => {
     const emoji = getVehicleEmoji(routeData.routeType);
@@ -564,10 +658,23 @@ function updateTrackedRoutesList() {
 // Event listeners
 function setupEventListeners() {
   // Track route button
-  document.getElementById('trackRouteBtn').addEventListener('click', () => {
+  document.getElementById('trackRouteBtn').addEventListener('click', async () => {
     const routeId = document.getElementById('routeDropdown').value;
     if (routeId) {
-      trackRoute(routeId);
+      const trackBtn = document.getElementById('trackRouteBtn');
+      const originalText = trackBtn.textContent;
+
+      // Show loading state
+      trackBtn.disabled = true;
+      trackBtn.textContent = 'Loading...';
+
+      try {
+        await trackRoute(routeId);
+      } finally {
+        // Restore button state
+        trackBtn.disabled = false;
+        trackBtn.textContent = originalText;
+      }
     } else {
       showStatus('Please select a route first', 'warning');
     }
