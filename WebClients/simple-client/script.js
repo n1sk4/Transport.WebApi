@@ -1,10 +1,56 @@
-// Configuration
-const apiBaseUrl = '/api/GtfsData/GetAllVehiclePositionsByRouteId';
-const routesApiUrl = '/api/GtfsData/GetAllStaticFileData?fileName=RoutesFile';
+// Configuration - can be set dynamically
+let apiConfig = {
+  "baseUrl": "",
+  "endpoints": {
+    "Configuration_GetApiConfiguration": "api/Configuration",
+    "GtfsData_GettAllDataFromStaticFile": "api/GtfsData/StaticData",
+    "Route_GetAllRoutes": "api/Route/AllRoutes",
+    "Route_GetRouteShape": "api/Route/RouteShape",
+    "Statistics_GetHealthStatus": "api/Statistics/health",
+    "Statistics_GetCacheStats": "api/Statistics/cache/stats",
+    "VehiclePosition_GetCurrentVehiclePositions": "api/VehiclePosition/CurrentPositions",
+    "VehiclePosition_GetCurrentVehiclePositionByRoute": "api/VehiclePosition/CurrentPositionByRoute"
+  }
+};
+
+// Initialize API configuration
+async function initializeApiConfig() {
+  try {
+    // Try to get config from server
+    const response = await fetch('/api/Configuration');
+    if (response.ok) {
+      const config = await response.json();
+      apiConfig = { ...apiConfig, ...config };
+    }
+  } catch (error) {
+    console.warn('Could not load API configuration, using defaults');
+  }
+}
+
+// API helper functions
+const api = {
+  async getVehiclePositions(routeId) {
+    const url = `${apiConfig.baseUrl}${apiConfig.endpoints.VehiclePosition_GetCurrentVehiclePositionByRoute}?routeId=${routeId}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  async getRoutes() {
+    const url = `${apiConfig.baseUrl}${apiConfig.endpoints.Route_GetAllRoutes}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return response.json();
+  }
+};
 
 // Global variables
-let trackedRoutes = new Map(); // Map of routeId -> {markers: [], interval: intervalId, vehicleCount: 0, visible: true, name: ''}
-let availableRoutes = new Map(); // Map of routeId -> {id, name, type}
+let trackedRoutes = new Map();
+let availableRoutes = new Map();
 let hasAutoFocused = false;
 
 // Initialize the map centered near Zagreb
@@ -31,103 +77,85 @@ function getRouteColor(routeId) {
   return routeColors[index % routeColors.length];
 }
 
-// Parse CSV-like route data
-function parseRouteData(csvString) {
-  const parts = [];
-  let current = '';
-  let inQuotes = false;
-  
-  for (let i = 0; i < csvString.length; i++) {
-    const char = csvString[i];
-    
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      parts.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  parts.push(current.trim());
-  
-  return {
-    id: parts[2] ? parts[2].replace(/"/g, '') : '',
-    name: parts[3] ? parts[3].replace(/"/g, '') : '',
-    type: parts[5] ? parseInt(parts[5]) : null // 0 = tram, 3 = bus
-  };
-}
-
 // Fetch and populate available routes
 async function loadAvailableRoutes() {
   try {
     showStatus('Loading available routes...', 'loading');
-    const response = await fetch(routesApiUrl);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    const routesData = await response.json();
+    const routesRaw = await api.getRoutes();
+
     availableRoutes.clear();
-    
-    // Clear the select options
     routeSelect.innerHTML = '<option value="">Select a route...</option>';
-    
-    // Parse and add routes
-    routesData.forEach(routeString => {
-      const route = parseRouteData(routeString);
-      if (route.id && route.name) {
-        const routeId = parseInt(route.id);
-        if (!isNaN(routeId)) {
-          availableRoutes.set(routeId, route);
-          
-          const option = document.createElement('option');
-          option.value = routeId;
-          
-          // Add emoji based on type
-          const typeEmoji = route.type === 0 ? '🚋' : route.type === 3 ? '🚌' : '🚐';
-          option.textContent = `${typeEmoji} ${route.id} - ${route.name}`;
-          option.title = `${route.name} (${route.type === 0 ? 'Tram' : route.type === 3 ? 'Bus' : 'Other'})`; // Tooltip on hover
-          routeSelect.appendChild(option);
-        }
+
+    // Each route is a CSV string: route_id,agency_id,route_short_name,route_long_name,route_type,route_color
+    routesRaw.forEach(routeLine => {
+      const parts = routeLine.split(',');
+      if (parts.length < 4) return;
+      const routeId = parseInt(parts[0]);
+      if (!routeId) return;
+
+      const agencyId = parts[1];
+      const shortName = parts[2];
+      const longName = parts[3];
+      const type = parts.length > 4 ? parseInt(parts[4]) : 3;
+      const color = parts.length > 5 ? `#${parts[5]}` : undefined;
+
+      availableRoutes.set(routeId, {
+        id: routeId,
+        name: shortName,
+        longName: longName,
+        type: isNaN(type) ? 3 : type,
+        color: color,
+        textColor: 'white'
+      });
+
+      const option = document.createElement('option');
+      option.value = routeId;
+
+      // Add emoji based on type
+      const typeEmoji = type === 0 ? '🚋' : type === 3 ? '🚌' : '🚐';
+      // Display route number and long name without quotes or extra spaces
+      const displayName = [shortName, longName].filter(s => s && s !== '""' && s !== "''" && s.trim() !== '').join(' ').trim();
+      option.textContent = `${typeEmoji} ${displayName}`;
+
+      if (longName) {
+        option.title = longName;
       }
+
+      routeSelect.appendChild(option);
     });
-    
-    // Enable the add button
+
     addButton.disabled = false;
     showStatus(`Loaded ${availableRoutes.size} routes`, 'success');
-    
+
   } catch (error) {
     console.error('Error loading routes:', error);
     showStatus('Failed to load routes. Check console for details.', 'error');
-    
-    // Fallback - enable manual input
+
     routeSelect.innerHTML = '<option value="">Failed to load - enter manually</option>';
     addButton.disabled = false;
   }
 }
 
 // Create custom emoji marker for vehicles
-function createVehicleMarker(lat, lng, routeId, vehicleIndex) {
+function createVehicleMarker(lat, lng, routeId, vehicleData, vehicleIndex) {
   const color = getRouteColor(routeId);
   const routeInfo = availableRoutes.get(routeId);
-  
+
   // Determine emoji based on route type
   let emoji = '🚐'; // default
   if (routeInfo) {
     emoji = routeInfo.type === 0 ? '🚋' : routeInfo.type === 3 ? '🚌' : '🚐';
   }
-  
-  const routeText = routeId.toString().slice(0, 3); // Limit to 3 digits for display
-  
+
+  const routeText = routeId.toString().slice(0, 3);
+
   return L.marker([lat, lng], {
     icon: L.divIcon({
       className: 'vehicle-marker',
       html: `
         <div style="
-          background-color: ${color};
-          color: white;
+          background-color: ${routeInfo?.color || color};
+          color: ${routeInfo?.textColor || 'white'};
           width: 36px;
           height: 36px;
           border-radius: 50%;
@@ -168,7 +196,40 @@ function createVehicleMarker(lat, lng, routeId, vehicleIndex) {
       iconSize: [42, 42],
       iconAnchor: [21, 21]
     })
-  });
+  }).bindPopup(createVehiclePopup(routeId, vehicleData, vehicleIndex));
+}
+
+// Create popup content for vehicle marker
+function createVehiclePopup(routeId, vehicleData, vehicleIndex) {
+  const routeInfo = availableRoutes.get(routeId);
+  const routeName = routeInfo?.name || routeInfo?.longName || '';
+  const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Vehicle';
+
+  let popup = `<strong>Route ${routeId}${routeName ? ` - ${routeName}` : ''}</strong><br>`;
+  popup += `<strong>${vehicleType} ${vehicleIndex + 1}</strong><br>`;
+
+  // Handle different possible property names from your ASP.NET models
+  if (vehicleData.latitude || vehicleData.lat) {
+    popup += `Latitude: ${(vehicleData.latitude || vehicleData.lat).toFixed(6)}<br>`;
+  }
+  if (vehicleData.longitude || vehicleData.lng || vehicleData.lon) {
+    popup += `Longitude: ${(vehicleData.longitude || vehicleData.lng || vehicleData.lon).toFixed(6)}<br>`;
+  }
+  if (vehicleData.speed) {
+    popup += `Speed: ${vehicleData.speed} km/h<br>`;
+  }
+  if (vehicleData.bearing || vehicleData.heading) {
+    popup += `Bearing: ${vehicleData.bearing || vehicleData.heading}°<br>`;
+  }
+  if (vehicleData.vehicleId || vehicleData.id) {
+    popup += `Vehicle ID: ${vehicleData.vehicleId || vehicleData.id}<br>`;
+  }
+  if (vehicleData.timestamp || vehicleData.lastUpdate) {
+    const time = new Date(vehicleData.timestamp || vehicleData.lastUpdate);
+    popup += `Last Update: ${time.toLocaleTimeString()}<br>`;
+  }
+
+  return popup;
 }
 
 // Show status message
@@ -176,7 +237,7 @@ function showStatus(message, type = 'loading') {
   statusDiv.textContent = message;
   statusDiv.className = `status ${type}`;
   statusDiv.style.display = 'block';
-  
+
   if (type === 'success' || type === 'error') {
     setTimeout(() => {
       statusDiv.style.display = 'none';
@@ -187,15 +248,15 @@ function showStatus(message, type = 'loading') {
 // Update the routes list display
 function updateRoutesList() {
   routesList.innerHTML = '';
-  
+
   trackedRoutes.forEach((routeData, routeId) => {
     const routeItem = document.createElement('div');
     routeItem.className = `route-item ${routeData.visible ? 'active' : ''}`;
-    
+
     const visibilityIcon = routeData.visible ? '👁️' : '👁️‍🗨️';
     const routeInfo = availableRoutes.get(routeId);
     const typeEmoji = routeInfo && routeInfo.type === 0 ? '🚋' : routeInfo && routeInfo.type === 3 ? '🚌' : '🚐';
-    
+
     routeItem.innerHTML = `
       <div class="visibility-toggle">${visibilityIcon}</div>
       <div class="route-info">
@@ -207,20 +268,17 @@ function updateRoutesList() {
       </div>
       <button class="remove-button" onclick="removeRoute(${routeId})" title="Remove Route">×</button>
     `;
-    
-    // Add tooltip with full route name and type
+
     const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Other';
     if (routeData.name) {
       routeItem.title = `${routeId} - ${routeData.name} (${vehicleType})`;
     }
-    
-    // Add click handler for visibility toggle
+
     routeItem.addEventListener('click', (e) => {
-      // Don't toggle if clicking the remove button
       if (e.target.classList.contains('remove-button')) return;
       toggleRouteVisibility(routeId);
     });
-    
+
     routesList.appendChild(routeItem);
   });
 }
@@ -229,17 +287,15 @@ function updateRoutesList() {
 function toggleRouteVisibility(routeId) {
   const routeData = trackedRoutes.get(routeId);
   if (!routeData) return;
-  
+
   routeData.visible = !routeData.visible;
-  
+
   if (routeData.visible) {
-    // Start tracking this route
     startTrackingRoute(routeId);
   } else {
-    // Stop tracking and hide markers
     stopTrackingRoute(routeId);
   }
-  
+
   updateRoutesList();
 }
 
@@ -249,12 +305,11 @@ function addRoute(routeId) {
     showStatus(`Route ${routeId} is already added`, 'error');
     return;
   }
-  
-  // Get route name from available routes
+
   const routeInfo = availableRoutes.get(routeId);
-  const routeName = routeInfo ? routeInfo.name : '';
+  const routeName = routeInfo ? (routeInfo.name || routeInfo.longName) : '';
   const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Other';
-  
+
   trackedRoutes.set(routeId, {
     markers: [],
     interval: null,
@@ -262,14 +317,11 @@ function addRoute(routeId) {
     visible: true,
     name: routeName
   });
-  
-  // Automatically start tracking when added
+
   startTrackingRoute(routeId);
-  
   updateRoutesList();
   showStatus(`${vehicleType} ${routeId}${routeName ? ` (${routeName})` : ''} added and tracking started`, 'success');
-  
-  // Reset select
+
   routeSelect.value = '';
 }
 
@@ -277,78 +329,57 @@ function addRoute(routeId) {
 function removeRoute(routeId) {
   const routeData = trackedRoutes.get(routeId);
   if (!routeData) return;
-  
-  // Stop tracking if active
+
   if (routeData.interval) {
     clearInterval(routeData.interval);
   }
-  
-  // Remove markers
+
   routeData.markers.forEach(marker => map.removeLayer(marker));
-  
-  // Remove from tracked routes
   trackedRoutes.delete(routeId);
-  
+
   updateRoutesList();
   showStatus(`Route ${routeId} removed`, 'success');
 }
 
-// Make removeRoute available globally for onclick handlers
 window.removeRoute = removeRoute;
 
 // Function to fetch and plot vehicle positions for a specific route
 async function fetchAndRenderVehicles(routeId) {
   const routeData = trackedRoutes.get(routeId);
   if (!routeData || !routeData.visible) return;
-  
+
   try {
-    const apiUrl = `${apiBaseUrl}?routeId=${routeId}`;
-    const response = await fetch(apiUrl);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    const vehicles = await response.json();
-    
+    const vehicles = await api.getVehiclePositions(routeId);
+
     // Clear existing markers for this route
     routeData.markers.forEach(marker => map.removeLayer(marker));
     routeData.markers = [];
-    
-    // Check if we got any vehicles
+
     if (!vehicles || vehicles.length === 0) {
       routeData.vehicleCount = 0;
       updateRoutesList();
       return;
     }
-    
+
     let plotted = 0;
-    
-    // Plot new markers
+
+    // Plot new markers - handle different possible property names
     vehicles.forEach((vehicle, index) => {
-      if (vehicle.hasLatitude && vehicle.hasLongitude) {
-        const routeInfo = availableRoutes.get(routeId);
-        const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Vehicle';
-        
-        const marker = createVehicleMarker(vehicle.latitude, vehicle.longitude, routeId, index)
-          .addTo(map)
-          .bindPopup(`
-            <strong>Route ${routeId}${routeData.name ? ` - ${routeData.name}` : ''}</strong><br>
-            <strong>${vehicleType} ${index + 1}</strong><br>
-            Latitude: ${vehicle.latitude.toFixed(6)}<br>
-            Longitude: ${vehicle.longitude.toFixed(6)}
-            ${vehicle.speed ? `<br>Speed: ${vehicle.speed} km/h` : ''}
-            ${vehicle.bearing ? `<br>Bearing: ${vehicle.bearing}°` : ''}
-          `);
-        
+      const lat = vehicle.latitude || vehicle.lat;
+      const lng = vehicle.longitude || vehicle.lng || vehicle.lon;
+      const hasPosition = (vehicle.hasLatitude && vehicle.hasLongitude) || (lat && lng);
+
+      if (hasPosition && lat && lng) {
+        const marker = createVehicleMarker(lat, lng, routeId, vehicle, index);
+        marker.addTo(map);
         routeData.markers.push(marker);
         plotted++;
       }
     });
-    
+
     routeData.vehicleCount = plotted;
     updateRoutesList();
-    
+
   } catch (error) {
     console.error(`Error fetching vehicle positions for route ${routeId}:`, error);
     routeData.vehicleCount = 0;
@@ -360,15 +391,13 @@ async function fetchAndRenderVehicles(routeId) {
 function startTrackingRoute(routeId) {
   const routeData = trackedRoutes.get(routeId);
   if (!routeData || routeData.interval) return;
-  
-  // Initial load
+
   fetchAndRenderVehicles(routeId);
-  
-  // Set up refresh interval
+
   routeData.interval = setInterval(() => {
     fetchAndRenderVehicles(routeId);
   }, 5000);
-  
+
   updateRoutesList();
 }
 
@@ -376,18 +405,16 @@ function startTrackingRoute(routeId) {
 function stopTrackingRoute(routeId) {
   const routeData = trackedRoutes.get(routeId);
   if (!routeData) return;
-  
+
   if (routeData.interval) {
     clearInterval(routeData.interval);
     routeData.interval = null;
   }
-  
+
   routeData.vehicleCount = 0;
-  
-  // Clear markers
   routeData.markers.forEach(marker => map.removeLayer(marker));
   routeData.markers = [];
-  
+
   updateRoutesList();
 }
 
@@ -401,7 +428,6 @@ addButton.addEventListener('click', () => {
   addRoute(routeId);
 });
 
-// Allow Enter key to add route when select is focused
 routeSelect.addEventListener('keypress', (e) => {
   if (e.key === 'Enter' && routeSelect.value) {
     addButton.click();
@@ -410,13 +436,14 @@ routeSelect.addEventListener('keypress', (e) => {
 
 // Initialize the application
 async function initialize() {
-  // Load available routes first
+  await initializeApiConfig();
   await loadAvailableRoutes();
-  
-  // Initialize with route 206 if it exists in available routes
-  if (availableRoutes.has(206)) {
-    routeSelect.value = 206;
-    addRoute(206);
+
+  // Initialize with a default route if available
+  const defaultRouteId = 206;
+  if (availableRoutes.has(defaultRouteId)) {
+    routeSelect.value = defaultRouteId;
+    addRoute(defaultRouteId);
   }
 }
 

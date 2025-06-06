@@ -1,4 +1,5 @@
 using TransitRealtime;
+using Transport.WebApi.Models;
 using Transport.WebApi.Options;
 
 namespace Transport.WebApi.Services;
@@ -15,91 +16,25 @@ public class GtfsService
   }
 
   #region Realtime Data Retrieval
-  public async Task<FeedMessage> GetAllRealtimeData()
+  public async Task<VehicleCurrentPosition> GetAllVechiclesCurrentPositions()
   {
-    byte[] data = await _gtfsDataService.GetRealtimeDataAsync();
-    FeedMessage feedMessage = FeedMessage.Parser.ParseFrom(data);
-    var formatter = new Google.Protobuf.JsonFormatter(new Google.Protobuf.JsonFormatter.Settings(true));
-    var json = formatter.Format(feedMessage);
-
-    return feedMessage;
+    return await GetPositions();
   }
 
-  public async Task<FeedEntity> GetAllDataRealtime()
+  public async Task<VehicleCurrentPosition> GetCurrentVehiclesPositionsByRoute(string routeId)
   {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    if (feedMessage.Entity.Count > 0)
-    {
-      return feedMessage.Entity[0];
-    }
-    else
-    {
-      throw new InvalidDataException("No data available in the feed.");
-    }
-  }
+    var positions = await GetPositions();
 
-  public async Task<FeedEntity[]> GetAllVehicles()
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    return feedMessage.Entity.Where(entity => entity.Vehicle != null).ToArray();
-  }
-
-  public async Task<FeedEntity?> GetAVehicleById(string vehicleId)
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    foreach (var entity in feedMessage.Entity)
-    {
-      if (entity.Vehicle != null && entity.Vehicle.Vehicle.Id == vehicleId)
-      {
-        return entity;
-      }
-    }
-
-    return null;
-  }
-
-  public async Task<FeedEntity[]> GetAllVehiclesByRoute(string routeId)
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    return feedMessage.Entity
-      .Where(entity => entity.Vehicle != null && entity.Vehicle.Trip != null && entity.Vehicle.Trip.RouteId == routeId)
-      .ToArray();
-  }
-
-  public async Task<List<Position>> GetAllVehiclePositionsByRouteId(string routeId)
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    return feedMessage.Entity
-        .Where(entity =>
-            entity.Vehicle != null &&
-            entity.Vehicle.Position != null &&
-            entity.Vehicle.Trip != null &&
-            entity.Vehicle.Trip.RouteId == routeId)
-        .Select(entity => entity.Vehicle.Position)
+    var routePositions = positions
+        .Where(kvp => kvp.Key == routeId)
+        .SelectMany<KeyValuePair<string, object>, string>(kvp => (IEnumerable<string>)kvp.Value)
         .ToList();
+
+    return new VehicleCurrentPosition { { routeId, routePositions } };
   }
-
-  public async Task<Dictionary<string, List<Position>>> GetAllVehiclePositions()
-  {
-    FeedMessage feedMessage = await GetAllRealtimeData();
-    var result = feedMessage.Entity
-        .Where(entity => entity.Vehicle != null &&
-                         entity.Vehicle.Position != null &&
-                         entity.Vehicle.Trip != null &&
-                         !string.IsNullOrEmpty(entity.Vehicle.Trip.RouteId))
-        .GroupBy(entity => entity.Vehicle.Trip.RouteId)
-        .ToDictionary(
-            g => g.Key,
-            g => g.Select(entity => entity.Vehicle.Position).ToList()
-        );
-
-    return result;
-  }
-
   #endregion
 
   #region Static Data Retrieval
-
   public async Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName)
   {
     var fileData = await _gtfsDataService.GetStaticFileDataAsync(fileName);
@@ -113,26 +48,110 @@ public class GtfsService
     }
   }
 
-  public async Task<List<string>> GetRouteShape(string routeId)
+  public async Task<List<JsonSerializedRoutes>> GetAllRoutes()
+  {
+    var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.RoutesFile);
+    if (fileData.Count > 0)
+    {
+      return fileData
+        .Select(line =>
+        {
+          var parts = line.Split(',');
+          return new JsonSerializedRoutes()
+          {
+            RouteId = parts.Length > 0 ? parts[0] : string.Empty,
+            RouteShortName = parts.Length > 2 ? parts[2].Replace("\"", string.Empty) : string.Empty,
+            RouteLongName = parts.Length > 3 ? parts[3].Replace("\"", string.Empty) : string.Empty,
+            RouteType = parts.Length > 5 ? parts[5] : string.Empty
+          };
+        })
+        .ToList();
+    }
+    else
+    {
+      throw new InvalidDataException("No route data available.");
+    }
+  }
+
+  public async Task<List<JsonSerializedRouteShapes>> GetRouteShape(string routeId)
   {
     var fileData = await _gtfsDataService.GetStaticFileDataAsync(GtfsStaticDataFile.ShapesFile);
     if (fileData.Count > 0)
     {
-      var routeShape = fileData
-          .Where(line => line.Contains(routeId))
-          .Select(line =>
+      return fileData
+        .Where(line =>
+        {
+          var parts = line.Split(',');
+          if (parts.Length == 0) return false;
+          var shapeId = parts[0].Replace("\"", string.Empty);
+          return shapeId.StartsWith($"{routeId}_");
+        })
+        .Select(line =>
+        {
+          var parts = line.Split(",");
+          string directionValue = string.Empty;
+          if (parts.Length > 0)
           {
-            var parts = line.Split(',');
-            return parts.Length > 1 ? string.Join(",", parts.Skip(1)) : string.Empty;
-          })
-          .ToList();
-      return routeShape;
+            var shapeId = parts[0].Replace("\"", string.Empty);
+            var underscoreIndex = shapeId.IndexOf('_');
+            if (underscoreIndex >= 0 && shapeId.Length > underscoreIndex + 1)
+            {
+              var dirChar = shapeId[underscoreIndex + 1];
+              directionValue = dirChar == '1' ? "outbound" :
+                                    dirChar == '2' ? "inbound" : string.Empty;
+            }
+          }
+          return new JsonSerializedRouteShapes()
+          {
+            Direction = directionValue,
+            Latitude = parts.Length > 1 ? parts[1] : "0.0",
+            Longitude = parts.Length > 2 ? parts[2] : "0.0",
+          };
+        })
+        .ToList();
     }
     else
     {
       throw new InvalidDataException($"No shape data available for route {routeId}.");
     }
   }
+  #endregion
 
+  #region Helper Methods
+  private async Task<FeedMessage> GetAllRealtimeData()
+  {
+    byte[] data = await _gtfsDataService.GetRealtimeDataAsync();
+    FeedMessage feedMessage = FeedMessage.Parser.ParseFrom(data);
+    var formatter = new Google.Protobuf.JsonFormatter(new Google.Protobuf.JsonFormatter.Settings(true));
+    var json = formatter.Format(feedMessage);
+
+    return feedMessage;
+  }
+
+  private async Task<VehicleCurrentPosition> GetPositions()
+  {
+    var feedMessage = await GetAllRealtimeData();
+    var vehiclePositions = feedMessage.Entity
+        .Where(e => e.Vehicle != null)
+        .Select(e => e.Vehicle)
+        .ToList();
+    if (vehiclePositions.Count == 0)
+    {
+      throw new InvalidDataException("No vehicle positions available in the realtime data.");
+    }
+
+    var vehiclePositionDict = new VehicleCurrentPosition();
+    foreach (var vehicle in vehiclePositions)
+    {
+      if (!vehiclePositionDict.ContainsKey(vehicle.Trip.RouteId))
+      {
+        vehiclePositionDict[vehicle.Trip.RouteId] = new List<string>();
+      }
+      var position = $"{vehicle.Position.Latitude},{vehicle.Position.Longitude}";
+      ((List<string>)vehiclePositionDict[vehicle.Trip.RouteId]).Add(position);
+    }
+
+    return vehiclePositionDict;
+  }
   #endregion
 }

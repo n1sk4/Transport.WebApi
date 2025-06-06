@@ -23,21 +23,7 @@ public class CachedGtfsDataService : IGtfsDataService
     _logger = logger;
   }
 
-  public async Task<List<string>> GetStaticFileDataAsync(GtfsStaticDataFile fileName)
-  {
-    var cacheKey = CacheKeyGenerator.GetStaticDataKey(fileName);
-
-    return await _cacheService.GetOrSetAsync(
-      cacheKey,
-      async () =>
-      {
-        _logger.LogInformation("Fetching static data for file: {FileName} from source", fileName);
-        return await _baseService.GetStaticFileDataAsync(fileName);
-      },
-      _cacheOptions.StaticCacheHours
-    );
-  }
-
+  #region Realtime Data Retrieval
   public async Task<byte[]> GetRealtimeDataAsync()
   {
     var cacheKey = CacheKeyGenerator.GetRealtimeDataKey();
@@ -52,4 +38,22 @@ public class CachedGtfsDataService : IGtfsDataService
       _cacheOptions.RealtimeCacheSeconds
     );
   }
+  #endregion
+
+  #region Static Data Retrieval
+  public async Task<List<string>> GetStaticFileDataAsync(GtfsStaticDataFile fileName)
+  {
+    var cacheKey = CacheKeyGenerator.GetStaticDataKey(fileName);
+
+    return await _cacheService.GetOrSetAsync(
+      cacheKey,
+      async () =>
+      {
+        _logger.LogInformation("Fetching static data for file: {FileName} from source", fileName);
+        return await _baseService.GetStaticFileDataAsync(fileName);
+      },
+      _cacheOptions.StaticCacheHours
+    );
+  }
+  #endregion
 }

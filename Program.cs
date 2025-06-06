@@ -161,8 +161,6 @@ internal class Program
       RequestPath = ""
     });
 
-    app.MapGet("/health", () => "OK");
-
     app.UseAuthorization();
     app.MapControllers();
   }

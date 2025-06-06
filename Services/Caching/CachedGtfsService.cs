@@ -1,4 +1,5 @@
 using TransitRealtime;
+using Transport.WebApi.Models;
 using Transport.WebApi.Options;
 using Transport.WebApi.Services.Caching;
 
@@ -23,86 +24,56 @@ public class CachedGtfsService : IGtfsService
     _logger = logger;
   }
 
-  public async Task<FeedEntity[]> GetAllVehicles()
+  #region Realtime Data Retrieval
+  public async Task<VehicleCurrentPosition> GetAllVechiclesCurrentPositions()
   {
-    var cacheKey = CacheKeyGenerator.GetAllVehiclesKey();
-
+    return await _cacheService.GetOrSetAsync(
+      CacheKeyGenerator.GetAllVehiclesCurrentPositionsKey(),
+      async () =>
+      {
+        _logger.LogDebug("Fetching all vehicles' current positions from source");
+        return await _baseService.GetAllVechiclesCurrentPositions();
+      },
+      _cacheOptions.RealtimeCacheSeconds
+    );
+  }
+  public async Task<VehicleCurrentPosition> GetCurrentVehiclesPositionsByRoute(string routeId)
+  {
+    var cacheKey = CacheKeyGenerator.GetCurrentVehiclesPositionsByRouteKey(routeId);
     return await _cacheService.GetOrSetAsync(
       cacheKey,
       async () =>
       {
-        _logger.LogDebug("Fetching all vehicles from source");
-        return await _baseService.GetAllVehicles();
+        _logger.LogDebug("Fetching current vehicle positions for route {RouteId} from source", routeId);
+        return await _baseService.GetCurrentVehiclesPositionsByRoute(routeId);
       },
       _cacheOptions.RealtimeCacheSeconds
     );
   }
+  #endregion
 
-  public async Task<FeedEntity?> GetAVehicleById(string vehicleId)
-  {
-    var cacheKey = CacheKeyGenerator.GetVehicleByIdKey(vehicleId);
-
-    return await _cacheService.GetOrSetAsync<FeedEntity>(
-      cacheKey,
-      async () =>
-      {
-        _logger.LogDebug("Fetching vehicle {VehicleId} from source", vehicleId);
-        return await _baseService.GetAVehicleById(vehicleId) ?? new FeedEntity();
-      },
-      _cacheOptions.RealtimeCacheSeconds
-    );
-  }
-
-  public async Task<FeedEntity[]> GetAllVehiclesByRoute(string routeId)
-  {
-    var cacheKey = CacheKeyGenerator.GetVehiclesByRouteKey(routeId);
-
-    return await _cacheService.GetOrSetAsync(
-      cacheKey,
-      async () =>
-      {
-        _logger.LogDebug("Fetching vehicles for route {RouteId} from source", routeId);
-        return await _baseService.GetAllVehiclesByRoute(routeId);
-      },
-      _cacheOptions.RealtimeCacheSeconds
-    );
-  }
-
-  public async Task<List<Position>> GetAllVehiclePositionsByRouteId(string routeId)
-  {
-    var cacheKey = CacheKeyGenerator.GetAllVehiclePositionsByRouteIdKey(routeId);
-    return await _cacheService.GetOrSetAsync(
-      cacheKey,
-      async () =>
-      {
-        _logger.LogDebug("Fetching all vehicle positions from source");
-        return await _baseService.GetAllVehiclePositionsByRouteId(routeId);
-      },
-      _cacheOptions.RealtimeCacheSeconds
-    );
-  }
-
-  public async Task<Dictionary<string, List<Position>>> GetAllVehiclePositions()
-  {
-    var cacheKey = CacheKeyGenerator.GetAllVehiclesKey();
-    return await _cacheService.GetOrSetAsync(
-      cacheKey,
-      async () =>
-      {
-        _logger.LogDebug("Fetching all vehicle positions from source");
-        return await _baseService.GetAllVehiclePositions();
-      },
-      _cacheOptions.RealtimeCacheSeconds
-    );
-  }
-
+  #region Static Data Retrieval
   public async Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName)
   {
     // Static data caching is handled at the data service level
     return await _baseService.GetAllStaticFileData(fileName);
   }
 
-  public async Task<List<string>> GetRouteShape(string routeId)
+  public async Task<List<JsonSerializedRoutes>> GetAllRoutes()
+  {
+    var cacheKey = CacheKeyGenerator.GetAllRoutesKey();
+    return await _cacheService.GetOrSetAsync(
+      cacheKey,
+      async () =>
+      {
+        _logger.LogDebug("Fetching all routes from source");
+        return await _baseService.GetAllRoutes();
+      },
+      _cacheOptions.StaticCacheHours
+    );
+  }
+
+  public async Task<List<JsonSerializedRouteShapes>> GetRouteShape(string routeId)
   {
     var cacheKey = CacheKeyGenerator.GetRouteShapeKey(routeId);
 
@@ -113,18 +84,8 @@ public class CachedGtfsService : IGtfsService
         _logger.LogDebug("Fetching route shape for {RouteId} from source", routeId);
         return await _baseService.GetRouteShape(routeId);
       },
-      _cacheOptions.RealtimeCacheSeconds
+      _cacheOptions.StaticCacheHours
     );
   }
-
-  // Delegate other methods to base service
-  public async Task<FeedMessage> GetAllRealtimeData()
-  {
-    return await _baseService.GetAllRealtimeData();
-  }
-
-  public async Task<FeedEntity> GetAllDataRealtime()
-  {
-    return await _baseService.GetAllDataRealtime();
-  }
+  #endregion
 }
