@@ -13,7 +13,7 @@
 <body>
   <div class="sidebar">
     <div class="controls">
-      <h3>Route Tracker</h3>
+      <h3>🚌 Zagreb Transport Tracker</h3>
       <div class="control-group">
         <label for="routeSelect">Select Route:</label>
         <div class="input-group">
@@ -23,16 +23,23 @@
           <button id="addButton" class="add-button" title="Add Route" disabled>+</button>
         </div>
       </div>
-      
+
+      <div class="control-group">
+        <div class="button-group">
+          <button id="showAllVehicles" class="secondary">Show All Vehicles</button>
+          <button id="clearAll" class="secondary">Clear All</button>
+        </div>
+      </div>
+
       <div class="tracked-routes">
         <h4>Active Routes</h4>
         <div id="routesList"></div>
       </div>
     </div>
-    
+
     <div id="status" class="status"></div>
   </div>
-  
+
   <div class="map-container">
     <div id="map"></div>
   </div>
