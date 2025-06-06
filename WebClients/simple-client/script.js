@@ -1,13 +1,11 @@
-// Configuration - can be set dynamically
+// Configuration - matches your actual API endpoints
 let apiConfig = {
   "baseUrl": "",
   "endpoints": {
     "Configuration_GetApiConfiguration": "api/Configuration",
-    "GtfsData_GettAllDataFromStaticFile": "api/GtfsData/StaticData",
     "Route_GetAllRoutes": "api/Route/AllRoutes",
     "Route_GetRouteShape": "api/Route/RouteShape",
     "Statistics_GetHealthStatus": "api/Statistics/health",
-    "Statistics_GetCacheStats": "api/Statistics/cache/stats",
     "VehiclePosition_GetCurrentVehiclePositions": "api/VehiclePosition/CurrentPositions",
     "VehiclePosition_GetCurrentVehiclePositionByRoute": "api/VehiclePosition/CurrentPositionByRoute"
   }
@@ -16,7 +14,6 @@ let apiConfig = {
 // Initialize API configuration
 async function initializeApiConfig() {
   try {
-    // Try to get config from server
     const response = await fetch('/api/Configuration');
     if (response.ok) {
       const config = await response.json();
@@ -33,6 +30,21 @@ const api = {
     const url = `${apiConfig.baseUrl}${apiConfig.endpoints.VehiclePosition_GetCurrentVehiclePositionByRoute}?routeId=${routeId}`;
     const response = await fetch(url);
     if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No vehicles for this route
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  async getAllVehiclePositions() {
+    const url = `${apiConfig.baseUrl}${apiConfig.endpoints.VehiclePosition_GetCurrentVehiclePositions}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No vehicles available
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     return response.json();
@@ -45,16 +57,29 @@ const api = {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     return response.json();
+  },
+
+  async getRouteShape(routeId) {
+    const url = `${apiConfig.baseUrl}${apiConfig.endpoints.Route_GetRouteShape}?routeId=${routeId}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No shape data for this route
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return response.json();
   }
 };
 
 // Global variables
 let trackedRoutes = new Map();
 let availableRoutes = new Map();
-let hasAutoFocused = false;
+let allVehiclesMarkers = [];
+let showingAllVehicles = false;
 
-// Initialize the map centered near Zagreb
-const map = L.map('map').setView([45.83, 16.05], 14);
+// Initialize the map centered on Zagreb
+const map = L.map('map').setView([45.8150, 15.9819], 12);
 
 // Add OpenStreetMap tiles
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -65,6 +90,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // Get DOM elements
 const routeSelect = document.getElementById('routeSelect');
 const addButton = document.getElementById('addButton');
+const showAllVehiclesButton = document.getElementById('showAllVehicles');
+const clearAllButton = document.getElementById('clearAll');
 const statusDiv = document.getElementById('status');
 const routesList = document.getElementById('routesList');
 
@@ -81,42 +108,41 @@ function getRouteColor(routeId) {
 async function loadAvailableRoutes() {
   try {
     showStatus('Loading available routes...', 'loading');
-    const routesRaw = await api.getRoutes();
+    const routesData = await api.getRoutes();
 
     availableRoutes.clear();
     routeSelect.innerHTML = '<option value="">Select a route...</option>';
 
-    // Each route is a CSV string: route_id,agency_id,route_short_name,route_long_name,route_type,route_color
-    routesRaw.forEach(routeLine => {
-      const parts = routeLine.split(',');
-      if (parts.length < 4) return;
-      const routeId = parseInt(parts[0]);
+    // Process the JsonSerializedRoutes array from your API
+    routesData.forEach(route => {
+      const routeId = parseInt(route.routeId);
       if (!routeId) return;
 
-      const agencyId = parts[1];
-      const shortName = parts[2];
-      const longName = parts[3];
-      const type = parts.length > 4 ? parseInt(parts[4]) : 3;
-      const color = parts.length > 5 ? `#${parts[5]}` : undefined;
+      // Clean up the route names
+      const shortName = route.routeShortName?.replace(/"/g, '').trim() || routeId.toString();
+      const longName = route.routeLongName?.replace(/"/g, '').trim() || '';
+      const routeType = parseInt(route.routeType) || 3;
 
       availableRoutes.set(routeId, {
         id: routeId,
-        name: shortName,
+        shortName: shortName,
         longName: longName,
-        type: isNaN(type) ? 3 : type,
-        color: color,
-        textColor: 'white'
+        type: routeType
       });
 
       const option = document.createElement('option');
       option.value = routeId;
 
       // Add emoji based on type
-      const typeEmoji = type === 0 ? '🚋' : type === 3 ? '🚌' : '🚐';
-      // Display route number and long name without quotes or extra spaces
-      const displayName = [shortName, longName].filter(s => s && s !== '""' && s !== "''" && s.trim() !== '').join(' ').trim();
-      option.textContent = `${typeEmoji} ${displayName}`;
+      const typeEmoji = routeType === 0 ? '🚋' : routeType === 3 ? '🚌' : '🚐';
 
+      // Display format: emoji + short name + long name (if different and exists)
+      let displayName = `${typeEmoji} ${shortName}`;
+      if (longName && longName !== shortName && longName.length > 0) {
+        displayName += ` - ${longName}`;
+      }
+
+      option.textContent = displayName;
       if (longName) {
         option.title = longName;
       }
@@ -130,16 +156,15 @@ async function loadAvailableRoutes() {
   } catch (error) {
     console.error('Error loading routes:', error);
     showStatus('Failed to load routes. Check console for details.', 'error');
-
-    routeSelect.innerHTML = '<option value="">Failed to load - enter manually</option>';
+    routeSelect.innerHTML = '<option value="">Failed to load routes</option>';
     addButton.disabled = false;
   }
 }
 
 // Create custom emoji marker for vehicles
-function createVehicleMarker(lat, lng, routeId, vehicleData, vehicleIndex) {
-  const color = getRouteColor(routeId);
-  const routeInfo = availableRoutes.get(routeId);
+function createVehicleMarker(lat, lng, routeId, isAllVehiclesMode = false) {
+  const color = isAllVehiclesMode ? '#ff6b6b' : getRouteColor(routeId);
+  const routeInfo = availableRoutes.get(parseInt(routeId));
 
   // Determine emoji based on route type
   let emoji = '🚐'; // default
@@ -147,15 +172,15 @@ function createVehicleMarker(lat, lng, routeId, vehicleData, vehicleIndex) {
     emoji = routeInfo.type === 0 ? '🚋' : routeInfo.type === 3 ? '🚌' : '🚐';
   }
 
-  const routeText = routeId.toString().slice(0, 3);
+  const routeText = routeId.toString().slice(-3); // Last 3 digits
 
   return L.marker([lat, lng], {
     icon: L.divIcon({
       className: 'vehicle-marker',
       html: `
         <div style="
-          background-color: ${routeInfo?.color || color};
-          color: ${routeInfo?.textColor || 'white'};
+          background-color: ${color};
+          color: white;
           width: 36px;
           height: 36px;
           border-radius: 50%;
@@ -196,38 +221,23 @@ function createVehicleMarker(lat, lng, routeId, vehicleData, vehicleIndex) {
       iconSize: [42, 42],
       iconAnchor: [21, 21]
     })
-  }).bindPopup(createVehiclePopup(routeId, vehicleData, vehicleIndex));
+  }).bindPopup(createVehiclePopup(routeId));
 }
 
 // Create popup content for vehicle marker
-function createVehiclePopup(routeId, vehicleData, vehicleIndex) {
-  const routeInfo = availableRoutes.get(routeId);
-  const routeName = routeInfo?.name || routeInfo?.longName || '';
+function createVehiclePopup(routeId) {
+  const routeInfo = availableRoutes.get(parseInt(routeId));
+  const routeName = routeInfo?.shortName || routeId.toString();
+  const longName = routeInfo?.longName || '';
   const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Vehicle';
 
-  let popup = `<strong>Route ${routeId}${routeName ? ` - ${routeName}` : ''}</strong><br>`;
-  popup += `<strong>${vehicleType} ${vehicleIndex + 1}</strong><br>`;
-
-  // Handle different possible property names from your ASP.NET models
-  if (vehicleData.latitude || vehicleData.lat) {
-    popup += `Latitude: ${(vehicleData.latitude || vehicleData.lat).toFixed(6)}<br>`;
+  let popup = `<strong>Route ${routeName}</strong><br>`;
+  if (longName && longName !== routeName) {
+    popup += `<em>${longName}</em><br>`;
   }
-  if (vehicleData.longitude || vehicleData.lng || vehicleData.lon) {
-    popup += `Longitude: ${(vehicleData.longitude || vehicleData.lng || vehicleData.lon).toFixed(6)}<br>`;
-  }
-  if (vehicleData.speed) {
-    popup += `Speed: ${vehicleData.speed} km/h<br>`;
-  }
-  if (vehicleData.bearing || vehicleData.heading) {
-    popup += `Bearing: ${vehicleData.bearing || vehicleData.heading}°<br>`;
-  }
-  if (vehicleData.vehicleId || vehicleData.id) {
-    popup += `Vehicle ID: ${vehicleData.vehicleId || vehicleData.id}<br>`;
-  }
-  if (vehicleData.timestamp || vehicleData.lastUpdate) {
-    const time = new Date(vehicleData.timestamp || vehicleData.lastUpdate);
-    popup += `Last Update: ${time.toLocaleTimeString()}<br>`;
-  }
+  popup += `<strong>${vehicleType}</strong><br>`;
+  popup += `Route ID: ${routeId}<br>`;
+  popup += `Last Update: ${new Date().toLocaleTimeString()}`;
 
   return popup;
 }
@@ -256,12 +266,13 @@ function updateRoutesList() {
     const visibilityIcon = routeData.visible ? '👁️' : '👁️‍🗨️';
     const routeInfo = availableRoutes.get(routeId);
     const typeEmoji = routeInfo && routeInfo.type === 0 ? '🚋' : routeInfo && routeInfo.type === 3 ? '🚌' : '🚐';
+    const routeName = routeInfo?.shortName || routeId.toString();
 
     routeItem.innerHTML = `
       <div class="visibility-toggle">${visibilityIcon}</div>
       <div class="route-info">
-        <div class="route-number">${typeEmoji} Route ${routeId}</div>
-        ${routeData.name ? `<div class="route-name">${routeData.name}</div>` : ''}
+        <div class="route-number">${typeEmoji} ${routeName}</div>
+        ${routeInfo?.longName ? `<div class="route-name">${routeInfo.longName}</div>` : ''}
         <div class="vehicle-count">
           ${routeData.visible ? `${routeData.vehicleCount} vehicles` : 'Hidden'}
         </div>
@@ -270,9 +281,7 @@ function updateRoutesList() {
     `;
 
     const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Other';
-    if (routeData.name) {
-      routeItem.title = `${routeId} - ${routeData.name} (${vehicleType})`;
-    }
+    routeItem.title = `${routeName} (${vehicleType})`;
 
     routeItem.addEventListener('click', (e) => {
       if (e.target.classList.contains('remove-button')) return;
@@ -307,20 +316,19 @@ function addRoute(routeId) {
   }
 
   const routeInfo = availableRoutes.get(routeId);
-  const routeName = routeInfo ? (routeInfo.name || routeInfo.longName) : '';
-  const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Other';
+  const routeName = routeInfo?.shortName || routeId.toString();
+  const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Vehicle';
 
   trackedRoutes.set(routeId, {
     markers: [],
     interval: null,
     vehicleCount: 0,
-    visible: true,
-    name: routeName
+    visible: true
   });
 
   startTrackingRoute(routeId);
   updateRoutesList();
-  showStatus(`${vehicleType} ${routeId}${routeName ? ` (${routeName})` : ''} added and tracking started`, 'success');
+  showStatus(`${vehicleType} ${routeName} added and tracking started`, 'success');
 
   routeSelect.value = '';
 }
@@ -349,13 +357,21 @@ async function fetchAndRenderVehicles(routeId) {
   if (!routeData || !routeData.visible) return;
 
   try {
-    const vehicles = await api.getVehiclePositions(routeId);
+    const vehicleData = await api.getVehiclePositions(routeId);
 
     // Clear existing markers for this route
     routeData.markers.forEach(marker => map.removeLayer(marker));
     routeData.markers = [];
 
-    if (!vehicles || vehicles.length === 0) {
+    if (!vehicleData || !vehicleData[routeId]) {
+      routeData.vehicleCount = 0;
+      updateRoutesList();
+      return;
+    }
+
+    // Extract vehicle positions from the response format
+    const positions = vehicleData[routeId];
+    if (!Array.isArray(positions)) {
       routeData.vehicleCount = 0;
       updateRoutesList();
       return;
@@ -363,22 +379,30 @@ async function fetchAndRenderVehicles(routeId) {
 
     let plotted = 0;
 
-    // Plot new markers - handle different possible property names
-    vehicles.forEach((vehicle, index) => {
-      const lat = vehicle.latitude || vehicle.lat;
-      const lng = vehicle.longitude || vehicle.lng || vehicle.lon;
-      const hasPosition = (vehicle.hasLatitude && vehicle.hasLongitude) || (lat && lng);
+    // Each position is a string in format "lat,lng"
+    positions.forEach((positionStr, index) => {
+      const coords = positionStr.split(',');
+      if (coords.length >= 2) {
+        const lat = parseFloat(coords[0]);
+        const lng = parseFloat(coords[1]);
 
-      if (hasPosition && lat && lng) {
-        const marker = createVehicleMarker(lat, lng, routeId, vehicle, index);
-        marker.addTo(map);
-        routeData.markers.push(marker);
-        plotted++;
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const marker = createVehicleMarker(lat, lng, routeId);
+          marker.addTo(map);
+          routeData.markers.push(marker);
+          plotted++;
+        }
       }
     });
 
     routeData.vehicleCount = plotted;
     updateRoutesList();
+
+    // Auto-focus on first route added
+    if (plotted > 0 && trackedRoutes.size === 1) {
+      const group = new L.featureGroup(routeData.markers);
+      map.fitBounds(group.getBounds().pad(0.1));
+    }
 
   } catch (error) {
     console.error(`Error fetching vehicle positions for route ${routeId}:`, error);
@@ -387,16 +411,127 @@ async function fetchAndRenderVehicles(routeId) {
   }
 }
 
+// Show all vehicles regardless of route
+async function showAllVehicles() {
+  try {
+    showStatus('Loading all vehicles...', 'loading');
+
+    // Clear existing markers
+    clearAllMarkers();
+
+    const allVehicleData = await api.getAllVehiclePositions();
+
+    if (!allVehicleData) {
+      showStatus('No vehicles currently available', 'error');
+      return;
+    }
+
+    let totalVehicles = 0;
+    allVehiclesMarkers = [];
+
+    // Process all routes and their vehicles
+    Object.keys(allVehicleData).forEach(routeId => {
+      const positions = allVehicleData[routeId];
+      if (Array.isArray(positions)) {
+        positions.forEach(positionStr => {
+          const coords = positionStr.split(',');
+          if (coords.length >= 2) {
+            const lat = parseFloat(coords[0]);
+            const lng = parseFloat(coords[1]);
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+              const marker = createVehicleMarker(lat, lng, routeId, true);
+              marker.addTo(map);
+              allVehiclesMarkers.push(marker);
+              totalVehicles++;
+            }
+          }
+        });
+      }
+    });
+
+    showingAllVehicles = true;
+    showAllVehiclesButton.textContent = 'Hide All Vehicles';
+
+    if (totalVehicles > 0) {
+      showStatus(`Showing ${totalVehicles} vehicles across all routes`, 'success');
+      // Fit map to show all vehicles
+      if (allVehiclesMarkers.length > 0) {
+        const group = new L.featureGroup(allVehiclesMarkers);
+        map.fitBounds(group.getBounds().pad(0.05));
+      }
+    } else {
+      showStatus('No vehicles found', 'error');
+    }
+
+  } catch (error) {
+    console.error('Error fetching all vehicles:', error);
+    showStatus('Failed to load vehicles', 'error');
+  }
+}
+
+// Hide all vehicles
+function hideAllVehicles() {
+  allVehiclesMarkers.forEach(marker => map.removeLayer(marker));
+  allVehiclesMarkers = [];
+  showingAllVehicles = false;
+  showAllVehiclesButton.textContent = 'Show All Vehicles';
+  showStatus('All vehicles hidden', 'success');
+}
+
+// Clear all markers and stop tracking
+function clearAllRoutes() {
+  // Stop all intervals
+  trackedRoutes.forEach((routeData, routeId) => {
+    if (routeData.interval) {
+      clearInterval(routeData.interval);
+    }
+    routeData.markers.forEach(marker => map.removeLayer(marker));
+  });
+
+  // Clear all vehicles markers
+  allVehiclesMarkers.forEach(marker => map.removeLayer(marker));
+  allVehiclesMarkers = [];
+
+  trackedRoutes.clear();
+  showingAllVehicles = false;
+  showAllVehiclesButton.textContent = 'Show All Vehicles';
+
+  updateRoutesList();
+  showStatus('All routes cleared', 'success');
+}
+
+// Clear all markers
+function clearAllMarkers() {
+  // Clear route-specific markers
+  trackedRoutes.forEach(routeData => {
+    routeData.markers.forEach(marker => map.removeLayer(marker));
+    routeData.markers = [];
+    routeData.vehicleCount = 0;
+  });
+
+  // Clear all vehicles markers
+  allVehiclesMarkers.forEach(marker => map.removeLayer(marker));
+  allVehiclesMarkers = [];
+
+  updateRoutesList();
+}
+
 // Start tracking a specific route
 function startTrackingRoute(routeId) {
   const routeData = trackedRoutes.get(routeId);
   if (!routeData || routeData.interval) return;
 
+  // Hide all vehicles view if active
+  if (showingAllVehicles) {
+    hideAllVehicles();
+  }
+
   fetchAndRenderVehicles(routeId);
 
   routeData.interval = setInterval(() => {
     fetchAndRenderVehicles(routeId);
-  }, 5000);
+  }, 10000); // Update every 10 seconds
 
   updateRoutesList();
 }
@@ -428,6 +563,18 @@ addButton.addEventListener('click', () => {
   addRoute(routeId);
 });
 
+showAllVehiclesButton.addEventListener('click', () => {
+  if (showingAllVehicles) {
+    hideAllVehicles();
+  } else {
+    showAllVehicles();
+  }
+});
+
+clearAllButton.addEventListener('click', () => {
+  clearAllRoutes();
+});
+
 routeSelect.addEventListener('keypress', (e) => {
   if (e.key === 'Enter' && routeSelect.value) {
     addButton.click();
@@ -439,12 +586,7 @@ async function initialize() {
   await initializeApiConfig();
   await loadAvailableRoutes();
 
-  // Initialize with a default route if available
-  const defaultRouteId = 206;
-  if (availableRoutes.has(defaultRouteId)) {
-    routeSelect.value = defaultRouteId;
-    addRoute(defaultRouteId);
-  }
+  showStatus('Ready! Select a route to start tracking vehicles.', 'success');
 }
 
 // Start the application
