@@ -6,8 +6,8 @@ let apiConfig = {
     "Route_GetAllRoutes": "api/Route/AllRoutes",
     "Route_GetRouteShape": "api/Route/RouteShape",
     "Statistics_GetHealthStatus": "api/Statistics/health",
-    "VehiclePosition_GetCurrentVehiclePositions": "api/VehiclePosition/CurrentPositions",
-    "VehiclePosition_GetCurrentVehiclePositionByRoute": "api/VehiclePosition/CurrentPositionByRoute"
+    "VehiclePosition_GetCurrentVehiclePositions": "api/VehiclePosition/CurrentPositionsEnhanced",
+    "VehiclePosition_GetCurrentVehiclePositionByRoute": "api/VehiclePosition/CurrentPositionByRouteEnhanced"
   }
 };
 
@@ -162,17 +162,22 @@ async function loadAvailableRoutes() {
 }
 
 // Create custom emoji marker for vehicles
-function createVehicleMarker(lat, lng, routeId, isAllVehiclesMode = false) {
-  const color = isAllVehiclesMode ? '#ff6b6b' : getRouteColor(routeId);
-  const routeInfo = availableRoutes.get(parseInt(routeId));
+function createVehicleMarker(lat, lng, routeType, routeId, routeShortName) {
+  const color = getRouteColor(routeId);
 
   // Determine emoji based on route type
   let emoji = '🚐'; // default
-  if (routeInfo) {
-    emoji = routeInfo.type === 0 ? '🚋' : routeInfo.type === 3 ? '🚌' : '🚐';
+  if (routeType === 0) {
+    emoji = '🚋'; // tram
+  } else if (routeType === 3) {
+    emoji = '🚌'; // bus
+  } else if (routeType === 1) {
+    emoji = '🚇'; // subway
+  } else if (routeType === 2) {
+    emoji = '🚆'; // rail
   }
 
-  const routeText = routeId.toString().slice(-3); // Last 3 digits
+  const routeText = routeShortName || routeId.toString().slice(-3);
 
   return L.marker([lat, lng], {
     icon: L.divIcon({
@@ -221,20 +226,14 @@ function createVehicleMarker(lat, lng, routeId, isAllVehiclesMode = false) {
       iconSize: [42, 42],
       iconAnchor: [21, 21]
     })
-  }).bindPopup(createVehiclePopup(routeId));
+  }).bindPopup(createVehiclePopup(routeId, routeShortName, routeType));
 }
 
 // Create popup content for vehicle marker
-function createVehiclePopup(routeId) {
-  const routeInfo = availableRoutes.get(parseInt(routeId));
-  const routeName = routeInfo?.shortName || routeId.toString();
-  const longName = routeInfo?.longName || '';
-  const vehicleType = routeInfo && routeInfo.type === 0 ? 'Tram' : routeInfo && routeInfo.type === 3 ? 'Bus' : 'Vehicle';
+function createVehiclePopup(routeId, routeShortName, routeType) {
+  const vehicleType = routeType === 0 ? 'Tram' : routeType === 3 ? 'Bus' : routeType === 1 ? 'Subway' : routeType === 2 ? 'Rail' : 'Vehicle';
 
-  let popup = `<strong>Route ${routeName}</strong><br>`;
-  if (longName && longName !== routeName) {
-    popup += `<em>${longName}</em><br>`;
-  }
+  let popup = `<strong>Route ${routeShortName || routeId}</strong><br>`;
   popup += `<strong>${vehicleType}</strong><br>`;
   popup += `Route ID: ${routeId}<br>`;
   popup += `Last Update: ${new Date().toLocaleTimeString()}`;
@@ -363,15 +362,7 @@ async function fetchAndRenderVehicles(routeId) {
     routeData.markers.forEach(marker => map.removeLayer(marker));
     routeData.markers = [];
 
-    if (!vehicleData || !vehicleData[routeId]) {
-      routeData.vehicleCount = 0;
-      updateRoutesList();
-      return;
-    }
-
-    // Extract vehicle positions from the response format
-    const positions = vehicleData[routeId];
-    if (!Array.isArray(positions)) {
+    if (!vehicleData || !vehicleData.vehicles || vehicleData.vehicles.length === 0) {
       routeData.vehicleCount = 0;
       updateRoutesList();
       return;
@@ -379,19 +370,19 @@ async function fetchAndRenderVehicles(routeId) {
 
     let plotted = 0;
 
-    // Each position is a string in format "lat,lng"
-    positions.forEach((positionStr, index) => {
-      const coords = positionStr.split(',');
-      if (coords.length >= 2) {
-        const lat = parseFloat(coords[0]);
-        const lng = parseFloat(coords[1]);
-
-        if (!isNaN(lat) && !isNaN(lng)) {
-          const marker = createVehicleMarker(lat, lng, routeId);
-          marker.addTo(map);
-          routeData.markers.push(marker);
-          plotted++;
-        }
+    // Plot vehicles using the enhanced data structure
+    vehicleData.vehicles.forEach((vehicle) => {
+      if (vehicle.latitude && vehicle.longitude) {
+        const marker = createVehicleMarker(
+          vehicle.latitude,
+          vehicle.longitude,
+          vehicleData.routeType,
+          vehicleData.routeId,
+          vehicleData.routeShortName
+        );
+        marker.addTo(map);
+        routeData.markers.push(marker);
+        plotted++;
       }
     });
 
@@ -412,6 +403,62 @@ async function fetchAndRenderVehicles(routeId) {
 }
 
 // Show all vehicles regardless of route
+async function showAllVehicles() {
+  try {
+    showStatus('Loading all vehicles...', 'loading');
+
+    // Clear existing markers
+    clearAllMarkers();
+
+    const allVehicleData = await api.getAllVehiclePositions();
+
+    if (!allVehicleData || !Array.isArray(allVehicleData)) {
+      showStatus('No vehicles currently available', 'error');
+      return;
+    }
+
+    let totalVehicles = 0;
+    allVehiclesMarkers = [];
+
+    // Process all routes and their vehicles using enhanced data structure
+    allVehicleData.forEach(routeData => {
+      if (routeData.vehicles && Array.isArray(routeData.vehicles)) {
+        routeData.vehicles.forEach(vehicle => {
+          if (vehicle.latitude && vehicle.longitude) {
+            const marker = createVehicleMarker(
+              vehicle.latitude,
+              vehicle.longitude,
+              routeData.routeType,
+              routeData.routeId,
+              routeData.routeShortName
+            );
+            marker.addTo(map);
+            allVehiclesMarkers.push(marker);
+            totalVehicles++;
+          }
+        });
+      }
+    });
+
+    showingAllVehicles = true;
+    showAllVehiclesButton.textContent = 'Hide All Vehicles';
+
+    if (totalVehicles > 0) {
+      showStatus(`Showing ${totalVehicles} vehicles across all routes`, 'success');
+      // Fit map to show all vehicles
+      if (allVehiclesMarkers.length > 0) {
+        const group = new L.featureGroup(allVehiclesMarkers);
+        map.fitBounds(group.getBounds().pad(0.05));
+      }
+    } else {
+      showStatus('No vehicles found', 'error');
+    }
+
+  } catch (error) {
+    console.error('Error fetching all vehicles:', error);
+    showStatus('Failed to load vehicles', 'error');
+  }
+}
 async function showAllVehicles() {
   try {
     showStatus('Loading all vehicles...', 'loading');
