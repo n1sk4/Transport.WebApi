@@ -12,4 +12,4 @@ python -m venv .venv
 python -m http.server 8000
 ```
 ## Open localhost:8000
-![image.png](https://github.com/n1sk4/Transport.WebApi/blob/master/WebClients/simple-client/image.png?raw=true)
+![🚋](https://raw.githubusercontent.com/n1sk4/Transport.WebApi/refs/heads/master/WebClients/simple-client/image.png)
