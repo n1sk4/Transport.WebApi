@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
@@ -42,6 +43,14 @@ internal class Program
   #region Service Configuration
   private static void ConfigureServices(WebApplicationBuilder builder)
   {
+    builder.Services.AddResponseCompression(options =>
+    {
+      options.Providers.Add<BrotliCompressionProvider>();
+      options.Providers.Add<GzipCompressionProvider>();
+      options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["application/json"]);
+      options.EnableForHttps = true;
+    });
+
     // Configuration with validation
     builder.Services.Configure<GtfsOptions>(builder.Configuration.GetSection("Gtfs"));
     builder.Services.Configure<CacheOptions>(builder.Configuration.GetSection("Cache"));
@@ -300,6 +309,7 @@ internal class Program
     }
 
     app.UseRouting();
+    app.UseResponseCompression();
     app.UseAuthorization();
     app.MapControllers();
 
