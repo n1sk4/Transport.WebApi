@@ -20,6 +20,42 @@ const STORAGE_KEYS = {
   cacheTimestamp: 'zet_routes_cache_timestamp_v2'
 };
 
+const simpleCache = {
+  data: new Map(),
+
+  async fetchWithCache(url, key) {
+    const cached = this.data.get(key);
+    const headers = {};
+
+    if (cached?.etag) {
+      headers['If-None-Match'] = cached.etag;
+    }
+
+    try {
+      const response = await fetch(url, { headers });
+
+      if (response.status === 304) {
+        console.log(`💾 Using cached ${key}`);
+        return { data: cached.data, fromCache: true };
+      }
+
+      const data = await response.json();
+      const etag = response.headers.get('ETag');
+
+      this.data.set(key, { data, etag });
+      console.log(`🔄 Fresh ${key} (${new Blob([JSON.stringify(data)]).size} bytes)`);
+
+      return { data, fromCache: false };
+    } catch (error) {
+      if (cached) {
+        console.log(`🔄 Using cached ${key} due to error`);
+        return { data: cached.data, fromCache: true };
+      }
+      throw error;
+    }
+  }
+};
+
 // Cache duration (24 hours)
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
@@ -45,49 +81,107 @@ function initializeMap() {
 
 // API helper functions
 const api = {
+  // Simple cache storage
+  cache: new Map(),
+
   async fetchAllRoutes() {
-    const startTime = performance.now();
-    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.allRoutes}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch routes: ${response.status} ${response.statusText}`);
-    }
-    const data = await response.json();
-    const endTime = performance.now();
-    console.log(`Routes API call took ${(endTime - startTime).toFixed(2)}ms`);
-    return data;
+    return this.fetchWithCache(
+      `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.allRoutes}`,
+      'routes',
+      'Routes'
+    );
   },
 
   async fetchAllVehicles() {
-    const startTime = performance.now();
-    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.currentPositionsEnhanced}`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.log('No vehicles available (404)');
-        return [];
-      }
-      throw new Error(`Failed to fetch all vehicles: ${response.status} ${response.statusText}`);
-    }
-    const data = await response.json();
-    const endTime = performance.now();
-    console.log(`All vehicles API call took ${(endTime - startTime).toFixed(2)}ms, returned ${data.length} routes`);
-    return data;
+    return this.fetchWithCache(
+      `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.currentPositionsEnhanced}`,
+      'all-vehicles',
+      'All vehicles'
+    );
   },
 
   async fetchVehiclesByRoute(routeId) {
+    return this.fetchWithCache(
+      `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.currentPositionByRouteEnhanced}?routeId=${routeId}`,
+      `route-${routeId}`,
+      `Route ${routeId}`
+    );
+  },
+
+  // New helper method that adds caching to any fetch
+  async fetchWithCache(url, cacheKey, logName) {
     const startTime = performance.now();
-    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.currentPositionByRouteEnhanced}?routeId=${routeId}`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.log(`No vehicles available for route ${routeId} (404)`);
-        return null;
-      }
-      throw new Error(`Failed to fetch vehicles for route ${routeId}: ${response.status} ${response.statusText}`);
+    const cached = this.cache.get(cacheKey);
+
+    // Prepare headers for conditional request
+    const headers = {};
+    if (cached?.etag) {
+      headers['If-None-Match'] = cached.etag;
     }
-    const data = await response.json();
-    const endTime = performance.now();
-    const vehicleCount = data?.vehicles?.length || 0;
-    console.log(`Route ${routeId} API call took ${(endTime - startTime).toFixed(2)}ms, returned ${vehicleCount} vehicles`);
-    return data;
+
+    try {
+      const response = await fetch(url, { headers });
+
+      // Handle 304 Not Modified - use cached data
+      if (response.status === 304) {
+        const endTime = performance.now();
+        console.log(`💾 ${logName} cache hit (${(endTime - startTime).toFixed(2)}ms)`);
+        return cached.data;
+      }
+
+      // Handle 404 errors
+      if (response.status === 404) {
+        console.log(`📭 No data available for ${logName} (404)`);
+        return cacheKey.includes('route-') ? null : [];
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${logName}: ${response.status} ${response.statusText}`);
+      }
+
+      // Parse response
+      const data = await response.json();
+      const endTime = performance.now();
+
+      // Store in cache with ETag
+      const etag = response.headers.get('ETag');
+      if (etag) {
+        this.cache.set(cacheKey, { data, etag });
+      }
+
+      // Calculate data size for logging
+      const dataSize = new Blob([JSON.stringify(data)]).size;
+      const vehicleCount = data?.length || data?.vehicles?.length;
+
+      console.log(`🔄 ${logName} fresh data (${(endTime - startTime).toFixed(2)}ms, ${(dataSize / 1024).toFixed(1)}KB${vehicleCount ? `, ${vehicleCount} items` : ''})`);
+
+      return data;
+
+    } catch (error) {
+      // Return cached data on error if available
+      if (cached?.data) {
+        const endTime = performance.now();
+        console.log(`🔄 ${logName} using cached data due to error (${(endTime - startTime).toFixed(2)}ms)`);
+        return cached.data;
+      }
+
+      console.error(`❌ ${logName} error:`, error);
+      throw error;
+    }
+  },
+
+  // Helper method to clear cache if needed
+  clearCache() {
+    this.cache.clear();
+    console.log('🗑️ API cache cleared');
+  },
+
+  // Helper method to get cache stats
+  getCacheStats() {
+    return {
+      entries: this.cache.size,
+      keys: Array.from(this.cache.keys())
+    };
   }
 };
 
@@ -606,13 +700,6 @@ function updateTrackedRoutesList() {
 
     return routeDataA.shortName.localeCompare(routeDataB.shortName, undefined, { numeric: true });
   });
-
-  console.log('Route entries for list:', routeEntries.map(([id, data]) => ({
-    id,
-    shortName: data.shortName,
-    routeType: data.routeType,
-    vehicleCount: data.vehicleCount
-  })));
 
   listContainer.innerHTML = routeEntries.map(([routeId, routeData]) => {
     const emoji = getVehicleEmoji(routeData.routeType);
