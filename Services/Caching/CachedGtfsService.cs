@@ -84,7 +84,6 @@ public class CachedGtfsService : IGtfsService
   #region Static Data Retrieval
   public async Task<List<string>> GetAllStaticFileData(GtfsStaticDataFile fileName)
   {
-    // Static data caching is handled at the data service level
     return await _baseService.GetAllStaticFileData(fileName);
   }
 

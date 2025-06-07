@@ -18,7 +18,7 @@ public class VehiclePositionController : ControllerBase
   }
 
   /// <summary>
-  /// Gets the current positions of all vehicles (legacy format)
+  /// Gets the current positions of all vehicles
   /// </summary>
   [HttpGet("CurrentPositions")]
   [ProducesResponseType(200, Type = typeof(List<VehicleCurrentPosition>))]
@@ -56,25 +56,34 @@ public class VehiclePositionController : ControllerBase
   {
     try
     {
-      _logger.LogDebug("GetCurrentVehiclePositionsEnhanced called");
+      var clientETag = Request.Headers.IfNoneMatch.FirstOrDefault()?.Trim('"');
       var vehiclePositions = await _gtfsService.GetAllVehiclesCurrentPositionsEnhanced();
+
       if (vehiclePositions != null && vehiclePositions.Count > 0)
       {
-        _logger.LogInformation("Retrieved enhanced data for {Count} routes", vehiclePositions.Count);
+        var hash = ComputeSimpleHash(vehiclePositions);
+
+        // Return 304 if client has current version
+        if (clientETag == hash)
+        {
+          return StatusCode(304);
+        }
+
+        SetCacheHeaders(vehiclePositions);
         return Ok(vehiclePositions);
       }
-      _logger.LogWarning("No current vehicle positions found");
+
       return NotFound("No current vehicle positions found");
     }
     catch (Exception ex)
     {
       _logger.LogError(ex, "Error retrieving enhanced vehicle positions");
-      return StatusCode(500, "Internal server error while retrieving vehicle positions");
+      return StatusCode(500, "Internal server error");
     }
   }
 
   /// <summary>
-  /// Gets the current position of a vehicle by its route (legacy format)
+  /// Gets the current position of a vehicle by its route
   /// </summary>
   [HttpGet("CurrentPositionByRoute")]
   [ProducesResponseType(200, Type = typeof(List<VehicleCurrentPosition>))]
@@ -128,4 +137,19 @@ public class VehiclePositionController : ControllerBase
       return StatusCode(500, "Internal server error while retrieving vehicle position");
     }
   }
+
+  #region Helper Methods
+  private void SetCacheHeaders<T>(T data)
+  {
+    var hash = ComputeSimpleHash(data);
+    Response.Headers.ETag = $"\"{hash}\"";
+    Response.Headers.CacheControl = "public, max-age=5, must-revalidate";
+  }
+
+  private string ComputeSimpleHash<T>(T data)
+  {
+    var json = System.Text.Json.JsonSerializer.Serialize(data);
+    return json.GetHashCode().ToString("x");
+  }
+  #endregion
 }
