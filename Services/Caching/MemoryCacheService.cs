@@ -123,10 +123,8 @@ public class MemoryCacheService : ICacheService
     return value;
   }
 
-  // New method to handle nullable types
   public async Task<T?> GetOrSetNullableAsync<T>(string key, Func<Task<T?>> factory, TimeSpan expiration) where T : class
   {
-    // Use a wrapper to store nullable values in cache
     var wrapper = await GetAsync<NullableWrapper<T>>(key);
     if (wrapper != null)
     {
@@ -142,7 +140,6 @@ public class MemoryCacheService : ICacheService
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 }
 
-// Helper class for nullable caching
 internal class NullableWrapper<T> where T : class
 {
   public T? Value { get; set; }

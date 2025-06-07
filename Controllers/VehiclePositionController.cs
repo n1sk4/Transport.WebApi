@@ -18,7 +18,7 @@ public class VehiclePositionController : ControllerBase
   }
 
   /// <summary>
-  /// Gets the current positions of all vehicles (legacy format)
+  /// Gets the current positions of all vehicles
   /// </summary>
   [HttpGet("CurrentPositions")]
   [ProducesResponseType(200, Type = typeof(List<VehicleCurrentPosition>))]
@@ -74,7 +74,7 @@ public class VehiclePositionController : ControllerBase
   }
 
   /// <summary>
-  /// Gets the current position of a vehicle by its route (legacy format)
+  /// Gets the current position of a vehicle by its route
   /// </summary>
   [HttpGet("CurrentPositionByRoute")]
   [ProducesResponseType(200, Type = typeof(List<VehicleCurrentPosition>))]

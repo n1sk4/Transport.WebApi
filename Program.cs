@@ -97,7 +97,6 @@ internal class Program
       return new CachedGtfsService(baseService, cacheService, cacheOptions, logger);
     });
 
-    // CORS Configuration with consistent naming
     builder.Services.AddCors(options =>
     {
       var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
@@ -109,7 +108,7 @@ internal class Program
           policy.WithOrigins(allowedOrigins)
                 .AllowAnyMethod()
                 .AllowAnyHeader()
-                .AllowCredentials(); // Added for better CORS support
+                .AllowCredentials();
         }
         else
         {
@@ -155,7 +154,6 @@ internal class Program
 
     builder.Services.AddEndpointsApiExplorer();
 
-    // Add background service for cache cleanup if needed
     if (builder.Environment.IsProduction())
     {
       builder.Services.AddHostedService<CacheCleanupService>();
@@ -256,7 +254,6 @@ internal class Program
       });
     }
 
-    // CORS - use consistent policy name
     if (app.Environment.IsDevelopment())
     {
       app.UseCors("DevelopmentCorsPolicy");
