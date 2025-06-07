@@ -9,7 +9,7 @@ Web API for getting the GTFS (General Transit Feed Specification) data
 ### Simple UI
 [More info in WebClients folder](WebClients/simple-client/ReadMe.md)
 
-![image](https://github.com/user-attachments/assets/cecbb560-6ff5-40fe-9e32-82e21bbd9c0d)
+![🚋](https://raw.githubusercontent.com/n1sk4/Transport.WebApi/refs/heads/master/WebClients/simple-client/image.png)
 
 ## Build
 > [!IMPORTANT] 
