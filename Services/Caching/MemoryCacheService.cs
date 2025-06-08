@@ -1,3 +1,5 @@
+using Google.Protobuf.WellKnownTypes;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
@@ -26,8 +28,50 @@ public class MemoryCacheService : ICacheService
     _cacheOptions = cacheOptions.Value;
   }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
   public async Task<T?> GetAsync<T>(string key) where T : class
+  {
+    return await Task.FromResult(GetSync<T>(key));
+  }
+
+  public async Task SetAsync<T>(string key, T value, TimeSpan expiration) where T : class
+  {
+    await Task.Run(() => SetSync(key, value, expiration));
+  }
+
+  public async Task RemoveAsync(string key)
+  {
+    await Task.Run(() => RemoveSync(key));
+  }
+
+  public async Task<T> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan expiration) where T : class
+  {
+    var cached = await GetAsync<T>(key);
+    if (cached != null)
+    {
+      return cached;
+    }
+
+    var value = await factory();
+    await SetAsync(key, value, expiration);
+    return value;
+  }
+
+  public async Task<T?> GetOrSetNullableAsync<T>(string key, Func<Task<T?>> factory, TimeSpan expiration) where T : class
+  {
+    var wrapper = await GetAsync<NullableWrapper<T>>(key);
+    if (wrapper != null)
+    {
+      return wrapper.Value;
+    }
+
+    var value = await factory();
+    var wrapperToCache = new NullableWrapper<T> { Value = value };
+    await SetAsync(key, wrapperToCache, expiration);
+    return value;
+  }
+
+  #region Helper Methods
+  private T? GetSync<T>(string key) where T : class
   {
     try
     {
@@ -42,7 +86,6 @@ public class MemoryCacheService : ICacheService
       }
 
       Interlocked.Increment(ref _missCount);
-
       if (_cacheOptions.LogCacheOperations)
       {
         _logger.LogDebug("Cache MISS for key: {CacheKey}, Type: {Type}", key, typeof(T).Name);
@@ -56,7 +99,7 @@ public class MemoryCacheService : ICacheService
     }
   }
 
-  public async Task SetAsync<T>(string key, T value, TimeSpan expiration) where T : class
+  private void SetSync<T>(string key, T value, TimeSpan expiration) where T : class
   {
     try
     {
@@ -91,7 +134,7 @@ public class MemoryCacheService : ICacheService
         if (_cacheOptions.LogCacheOperations)
         {
           _logger.LogDebug("Cache item evicted - Key: {Key}, Reason: {Reason}, Type: {Type}",
-            evictedKey, reason, typeof(T).Name);
+          evictedKey, reason, typeof(T).Name);
         }
       });
 
@@ -116,11 +159,13 @@ public class MemoryCacheService : ICacheService
     }
   }
 
-  public async Task RemoveAsync(string key)
+  private void RemoveSync(string key)
   {
     try
     {
       _memoryCache.Remove(key);
+      _entryMetadata.TryRemove(key, out _);
+
       if (_cacheOptions.LogCacheOperations)
       {
         _logger.LogDebug("Cache REMOVE - Key: {CacheKey}", key);
@@ -129,39 +174,10 @@ public class MemoryCacheService : ICacheService
     catch (Exception ex)
     {
       _logger.LogError(ex, "Error removing cache for key: {CacheKey}", key);
+      throw;
     }
   }
 
-  public async Task<T> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan expiration) where T : class
-  {
-    var cached = await GetAsync<T>(key);
-    if (cached != null)
-    {
-      return cached;
-    }
-
-    var value = await factory();
-    await SetAsync(key, value, expiration);
-    return value;
-  }
-
-  public async Task<T?> GetOrSetNullableAsync<T>(string key, Func<Task<T?>> factory, TimeSpan expiration) where T : class
-  {
-    var wrapper = await GetAsync<NullableWrapper<T>>(key);
-    if (wrapper != null)
-    {
-      return wrapper.Value;
-    }
-
-    var value = await factory();
-    var wrapperToCache = new NullableWrapper<T> { Value = value };
-    await SetAsync(key, wrapperToCache, expiration);
-    return value;
-  }
-
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
-
-  #region Helper Methods
   public CacheDiagnostics GetDiagnostics()
   {
     // Clean up expired entries
