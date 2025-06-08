@@ -80,14 +80,21 @@ internal class Program
       client.DefaultRequestHeaders.Add("User-Agent", "Transport.WebApi/1.0");
     });
 
-    // Register services with proper interface implementations
     builder.Services.AddScoped<GtfsDataService>();
-    builder.Services.AddScoped<GtfsService>();
+    builder.Services.AddScoped<GtfsService>((provider) =>
+    {
+      var dataService = provider.GetRequiredService<GtfsDataService>();
+      var logger = provider.GetRequiredService<ILogger<GtfsService>>();
+      var cacheService = provider.GetRequiredService<ICacheService>();
+      var cacheOptions = provider.GetRequiredService<IOptions<CacheOptions>>();
+
+      return new GtfsService(dataService, logger, cacheService, cacheOptions);
+    });
 
     // Register the global exception filter
     builder.Services.AddScoped<GlobalExceptionFilter>();
 
-    // Register interfaces with decorator pattern
+    // Register interfaces
     builder.Services.AddScoped<IGtfsDataService>(provider =>
     {
       var baseService = provider.GetRequiredService<GtfsDataService>();
@@ -140,7 +147,6 @@ internal class Program
     // Controllers and API configuration
     builder.Services.AddControllers(options =>
     {
-      // Add global exception handling
       options.Filters.Add<GlobalExceptionFilter>();
     })
     .AddJsonOptions(options =>
@@ -189,7 +195,6 @@ internal class Program
 
       c.UseInlineDefinitionsForEnums();
 
-      // Add XML comments if available
       var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
       var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
       if (File.Exists(xmlPath))

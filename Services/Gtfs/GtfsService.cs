@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Options;
 using TransitRealtime;
 using Transport.WebApi.Models;
 using Transport.WebApi.Options;
+using Transport.WebApi.Services.Caching;
 
 namespace Transport.WebApi.Services.Gtfs;
 
@@ -8,12 +10,19 @@ public class GtfsService
 {
   private readonly ILogger<GtfsService> _logger;
   private GtfsDataService _gtfsDataService;
-  private Dictionary<string, JsonSerializedRoutes> _routeCache = new();
+  private readonly ICacheService _cacheService;
+  private readonly CacheOptions _cacheOptions;
 
-  public GtfsService(GtfsDataService gtfsDataService, ILogger<GtfsService> logger)
+  public GtfsService(
+    GtfsDataService gtfsDataService,
+    ILogger<GtfsService> logger,
+    ICacheService cacheService,
+    IOptions<CacheOptions> cacheOptions)
   {
     _gtfsDataService = gtfsDataService;
     _logger = logger;
+    _cacheService = cacheService;
+    _cacheOptions = cacheOptions.Value;
   }
 
   #region Realtime Data Retrieval
@@ -36,25 +45,23 @@ public class GtfsService
 
   private async Task<JsonSerializedRoutes?> GetRouteInfo(string routeId)
   {
-    if (_routeCache.ContainsKey(routeId))
+    var cacheKey = $"route-info:{routeId}";
+
+    var cachedRoute = await _cacheService.GetAsync<JsonSerializedRoutes>(cacheKey);
+    if (cachedRoute != null)
     {
-      return _routeCache[routeId];
+      return cachedRoute;
     }
 
-    try
-    {
-      var allRoutes = await GetAllRoutes();
-      foreach (var route in allRoutes)
-      {
-        _routeCache[route.RouteId] = route;
-      }
+    var allRoutes = await GetAllRoutes();
+    var route = allRoutes.FirstOrDefault(r => r.RouteId == routeId);
 
-      return _routeCache.ContainsKey(routeId) ? _routeCache[routeId] : null;
-    }
-    catch
+    if (route != null)
     {
-      return null;
+      await _cacheService.SetAsync(cacheKey, route, _cacheOptions.StaticCacheDuration);
     }
+
+    return route;
   }
 
   public async Task<List<EnhancedVehiclePosition>> GetAllVehiclesCurrentPositionsEnhanced()
