@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
 using Transport.WebApi.Options;
 
 namespace Transport.WebApi.Services.Caching;
@@ -9,6 +10,11 @@ public class MemoryCacheService : ICacheService
   private readonly IMemoryCache _memoryCache;
   private readonly ILogger<MemoryCacheService> _logger;
   private readonly CacheOptions _cacheOptions;
+
+  private readonly ConcurrentDictionary<string, CacheEntryInfo> _entryMetadata = new();
+  private int _hitCount = 0;
+  private int _missCount = 0;
+  private DateTime _lastCompaction = DateTime.UtcNow;
 
   public MemoryCacheService(
     IMemoryCache memoryCache,
@@ -27,12 +33,15 @@ public class MemoryCacheService : ICacheService
     {
       if (_memoryCache.TryGetValue(key, out var cached))
       {
+        Interlocked.Increment(ref _hitCount);
         if (_cacheOptions.LogCacheOperations)
         {
           _logger.LogDebug("Cache HIT for key: {CacheKey}, Type: {Type}", key, typeof(T).Name);
         }
         return (T?)cached;
       }
+
+      Interlocked.Increment(ref _missCount);
 
       if (_cacheOptions.LogCacheOperations)
       {
@@ -51,37 +60,49 @@ public class MemoryCacheService : ICacheService
   {
     try
     {
-      int size = value switch
-      {
-        ICollection<object> collection => Math.Max(1, collection.Count / 10),
-        string str => Math.Max(1, str.Length / 1000),
-        byte[] bytes => Math.Max(1, bytes.Length / 10000),
-        _ => 1
-      };
+      long estimatedSize = EstimateObjectSize(value);
 
       var cacheOptions = new MemoryCacheEntryOptions
       {
         AbsoluteExpirationRelativeToNow = expiration,
         SlidingExpiration = null, // No sliding expiration for GTFS data
         Priority = CacheItemPriority.Normal,
-        Size = size
+        Size = Math.Max(1, (int)(estimatedSize / 1000)) // Convert bytes to cache units
       };
 
-      if (_cacheOptions.LogCacheOperations)
+      var entryInfo = new CacheEntryInfo
       {
-        cacheOptions.RegisterPostEvictionCallback((evictedKey, evictedValue, reason, state) =>
+        Key = key,
+        SetAt = DateTime.UtcNow,
+        ExpiresAt = DateTime.UtcNow.Add(expiration),
+        EstimatedSize = estimatedSize,
+        DataType = typeof(T).Name
+      };
+
+      cacheOptions.RegisterPostEvictionCallback((evictedKey, evictedValue, reason, state) =>
+      {
+        _entryMetadata.TryRemove(evictedKey.ToString() ?? string.Empty, out _);
+
+        if (reason == EvictionReason.Capacity)
+        {
+          _lastCompaction = DateTime.UtcNow;
+        }
+
+        if (_cacheOptions.LogCacheOperations)
         {
           _logger.LogDebug("Cache item evicted - Key: {Key}, Reason: {Reason}, Type: {Type}",
             evictedKey, reason, typeof(T).Name);
-        });
-      }
+        }
+      });
 
       _memoryCache.Set(key, value, cacheOptions);
 
+      _entryMetadata[key] = entryInfo;
+
       if (_cacheOptions.LogCacheOperations)
       {
-        _logger.LogDebug("Cache SET - Key: {CacheKey}, Expires in: {Expiration}, Size: {Size}, Type: {Type}",
-          key, expiration, size, typeof(T).Name);
+        _logger.LogDebug("Cache SET - Key: {CacheKey}, Expires in: {Expiration}, Size: {Size}KB, Type: {Type}",
+          key, expiration, estimatedSize / 1024, typeof(T).Name);
       }
       else
       {
@@ -91,6 +112,7 @@ public class MemoryCacheService : ICacheService
     catch (Exception ex)
     {
       _logger.LogError(ex, "Error setting cache for key: {CacheKey}", key);
+      throw;
     }
   }
 
@@ -138,6 +160,53 @@ public class MemoryCacheService : ICacheService
   }
 
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+
+  #region Helper Methods
+  public CacheDiagnostics GetDiagnostics()
+  {
+    // Clean up expired entries
+    var expiredKeys = _entryMetadata
+        .Where(kvp => kvp.Value.IsExpired)
+        .Select(kvp => kvp.Key)
+        .ToList();
+
+    foreach (var expiredKey in expiredKeys)
+    {
+      _entryMetadata.TryRemove(expiredKey, out _);
+    }
+
+    var activeEntries = _entryMetadata.Values.Where(e => !e.IsExpired).ToList();
+
+    return new CacheDiagnostics
+    {
+      TotalEntries = activeEntries.Count,
+      EstimatedMemoryUsage = activeEntries.Sum(e => e.EstimatedSize),
+      HitCount = _hitCount,
+      MissCount = _missCount,
+      RecentEntries = activeEntries.OrderByDescending(e => e.SetAt).Take(20).ToList(),
+      LastCompaction = _lastCompaction
+    };
+  }
+
+  public bool ContainsKey(string key) => _memoryCache.TryGetValue(key, out _);
+
+  public void ClearCache()
+  {
+    _entryMetadata.Clear();
+    _logger.LogInformation("Cache metadata cleared");
+  }
+
+  private static long EstimateObjectSize<T>(T obj)
+  {
+    return obj switch
+    {
+      ICollection<object> collection => Math.Max(1000, collection.Count * 100),
+      string str => Math.Max(100, str.Length * 2),
+      byte[] bytes => bytes.Length,
+      _ => 1000
+    };
+  }
+  #endregion
 }
 
 internal class NullableWrapper<T> where T : class

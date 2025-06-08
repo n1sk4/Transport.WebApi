@@ -65,19 +65,19 @@ public class CacheDiagnosticsController : ControllerBase
   [HttpGet("check-key/{key}")]
   public IActionResult CheckCacheKey(string key)
   {
-    if (!HttpContext.RequestServices.GetService<IWebHostEnvironment>()?.IsDevelopment() ?? false)
+    if (!IsDevelopmentEnvironment())
     {
-      return NotFound("Development only");
+      return NotFound();
     }
 
-    var exists = _memoryCache.TryGetValue(key, out var value);
+    var exists = _cacheService.ContainsKey(key);
 
     return Ok(new
     {
       Key = key,
       Exists = exists,
-      Value = value,
-      CheckedAt = DateTime.UtcNow
+      CheckedAt = DateTime.UtcNow,
+      Message = exists ? "Key found in cache" : "Key not found or expired"
     });
   }
 
@@ -118,86 +118,34 @@ public class CacheDiagnosticsController : ControllerBase
   /// Get detailed memory cache statistics
   /// </summary>
   [HttpGet("memory-stats")]
-  public IActionResult GetMemoryCacheStats()
+  public IActionResult GetCacheStats()
   {
-    if (!HttpContext.RequestServices.GetService<IWebHostEnvironment>()?.IsDevelopment() ?? false)
+    if (!IsDevelopmentEnvironment())
     {
-      return NotFound("Development only");
+      return NotFound();
     }
 
     try
     {
-      var stats = new
-      {
-        CacheType = _memoryCache.GetType().Name,
-        Entries = new List<object>()
-      };
-
-      // Use reflection to access internal cache entries
-      if (_memoryCache is MemoryCache mc)
-      {
-        var field = typeof(MemoryCache).GetField("_coherentState", BindingFlags.NonPublic | BindingFlags.Instance);
-        if (field?.GetValue(mc) is object coherentState)
-        {
-          var entriesField = coherentState.GetType().GetProperty("EntriesCollection", BindingFlags.NonPublic | BindingFlags.Instance);
-          if (entriesField?.GetValue(coherentState) is IDictionary entries)
-          {
-            foreach (DictionaryEntry entry in entries)
-            {
-              try
-              {
-                var key = entry.Key?.ToString() ?? "null";
-                var entryObj = entry.Value;
-
-                // Try to get expiration info using reflection
-                var expirationTime = "Unknown";
-                var isExpired = false;
-
-                if (entryObj != null)
-                {
-                  var expirationProperty = entryObj.GetType().GetProperty("AbsoluteExpiration", BindingFlags.Public | BindingFlags.Instance);
-                  if (expirationProperty?.GetValue(entryObj) is DateTimeOffset expiration)
-                  {
-                    expirationTime = expiration.ToString("yyyy-MM-dd HH:mm:ss");
-                    isExpired = expiration < DateTimeOffset.UtcNow;
-                  }
-                }
-
-                stats.Entries.Add(new
-                {
-                  Key = key,
-                  ExpirationTime = expirationTime,
-                  IsExpired = isExpired,
-                  HasValue = entryObj != null
-                });
-              }
-              catch (Exception ex)
-              {
-                stats.Entries.Add(new
-                {
-                  Key = entry.Key?.ToString() ?? "error",
-                  Error = ex.Message
-                });
-              }
-            }
-          }
-        }
-      }
+      var diagnostics = _cacheService.GetDiagnostics();
 
       return Ok(new
       {
-        Statistics = stats,
-        TotalEntries = stats.Entries.Count,
+        Statistics = diagnostics,
+        Configuration = new
+        {
+          RealtimeCacheSeconds = _cacheOptions.RealtimeCacheSeconds,
+          StaticCacheHours = _cacheOptions.StaticCacheHours,
+          CacheSizeLimit = _cacheOptions.CacheSizeLimit,
+          CompactionPercentage = _cacheOptions.CompactionPercentage
+        },
         CheckedAt = DateTime.UtcNow
       });
     }
     catch (Exception ex)
     {
-      return Ok(new
-      {
-        Error = ex.Message,
-        Message = "Could not retrieve detailed cache statistics"
-      });
+      _logger.LogError(ex, "Error retrieving cache diagnostics");
+      return StatusCode(500, new { Error = "Failed to retrieve cache diagnostics" });
     }
   }
 
@@ -250,5 +198,12 @@ public class CacheDiagnosticsController : ControllerBase
       ConfiguredExpirationSeconds = _cacheOptions.RealtimeCacheDuration,
       Message = $"Test completed. Cache should expire in {_cacheOptions.RealtimeCacheDuration} seconds. Check again with GET /api/CacheDiagnostics/check-key/{Uri.EscapeDataString(testKey)}"
     });
+  }
+
+  private bool IsDevelopmentEnvironment()
+  {
+    return HttpContext.RequestServices
+        .GetService<IWebHostEnvironment>()?
+        .IsDevelopment() ?? false;
   }
 }

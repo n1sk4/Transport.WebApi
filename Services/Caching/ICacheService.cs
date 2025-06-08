@@ -7,4 +7,8 @@ public interface ICacheService
   Task RemoveAsync(string key);
   Task<T> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan expiration) where T : class;
   Task<T?> GetOrSetNullableAsync<T>(string key, Func<Task<T?>> factory, TimeSpan expiration) where T : class;
+
+  CacheDiagnostics GetDiagnostics();
+  bool ContainsKey(string key);
+  void ClearCache();
 }
